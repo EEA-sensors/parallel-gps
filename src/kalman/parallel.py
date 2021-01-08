@@ -93,7 +93,11 @@ def pkf(m0, P0, Fs, Qs, Hs, Rs, observations, return_loglikelihood=False, max_pa
                                       initial_elements,
                                       max_num_levels=math.ceil(math.log2(max_parallel)))
     if return_loglikelihood:
-        dists = MultivariateNormalFullCovariance(final_elements[1], final_elements[2])
+        predicted_means = tf.concat([[m0], final_elements[1][:-1]], axis=0)
+        predicted_covs = mm(Fs, mm(tf.concat([[P0], final_elements[2][:-1]], axis=0), Fs, transpose_b=True)) + Qs
+        obs_means = mm(Hs, predicted_means)
+        obs_covs = mm(Hs, mm(predicted_covs, Hs, transpose_b=True))
+        dists = MultivariateNormalFullCovariance(obs_means, obs_covs)
         logprobs = dists.log_prob(observations)
         return tf.reduce_sum(logprobs), final_elements[1], final_elements[2]
     return final_elements[1], final_elements[2]
