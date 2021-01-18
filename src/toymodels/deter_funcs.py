@@ -12,9 +12,9 @@ def sinu(t: np.ndarray) -> np.ndarray:
     y = sin(2 pi t) + sin(4 pi t) + cos(6 pi t) 
     
     Args:
-        t:  Input (time)
+        t:  (n, ) Input (time)
     Return:
-        y:  y(t)
+        y:  (n, ) y(t)
     """
     return np.sin(2 * np.pi * t) \
             + np.sin(4 * np.pi * t) \
@@ -32,9 +32,9 @@ def comp_sinu(t: np.ndarray) -> np.ndarray:
         Deep State-space Gaussian processes. 2020
     
     Args:
-        t:  Input (time)
+        t:  (n, ) Input (time)
     Return:
-        y:  y(t)
+        y:  (n, ) y(t)
     """
     return np.sin(7 * np.pi * np.cos(2 * np.pi * (t ** 2))) ** 2 / \
             (np.cos(5 * np.pi * t) + 2)
@@ -49,9 +49,9 @@ def rect(t: np.ndarray) -> np.ndarray:
         Deep State-space Gaussian processes. 2020
     
     Args:
-        t:  Input (time)
+        t:  (n, ) Input (time)
     Return:
-        y:  y(t)
+        y:  (n, ) y(t)
     """
     # Scale to [0, 1]
     tau = (t - np.min(t)) / (np.max(t) - np.min(t))
@@ -75,5 +75,9 @@ def obs_noise(x: np.ndarray,
     """
     Observe data x with Gaussian noises. 
     y = x + r,   r ~ N(0, R)
+    
+    Args:
+        x: (n, )
+        R: (n, n)
     """
     return x + np.linalg.cholesky(R) @ np.random.randn(x.shape[0])

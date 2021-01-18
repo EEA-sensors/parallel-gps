@@ -6,9 +6,9 @@ Draw a sample from a GP.
 import numpy as np
 from scipy.linalg import expm
 
-from ..kalman import StateSpaceModel
+# from ..kalman import StateSpaceModel
 
-def draw_gp_batch(gp: StateSpaceModel,
+def draw_gp_batch(gp: None,
                   T: np.ndarray) -> np.ndarray:
     """
     Draw a sample from an GP given cov and mean functions.
@@ -26,7 +26,7 @@ def draw_gp_batch(gp: StateSpaceModel,
     return m + np.linalg.cholesky(cov) @ np.random.randn(T.shape[0])
 
 
-def draw_gp_ss(gp: StateSpaceModel, 
+def draw_gp_ss(gp: None, 
                T: np.ndarray, 
                t0: float,
                m0: np.ndarray, 

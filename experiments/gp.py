@@ -2,7 +2,7 @@ import numpy as np
 import gpflow as gpf
 import tensorflow as tf
 
-from ..src.toymodels import sinu, obs_noise
+from src.toymodels import sinu, obs_noise
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ y = obs_noise(ft, 0.01*np.eye(t.shape[0]))
 cov_func = gpf.kernels.Matern32()
 
 # Init regression model
-m = gpf.models.GPR(data=(t, y), 
+m = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))), 
                    kernel=cov_func, 
                    mean_function=None)
 
@@ -32,6 +32,20 @@ opt = gpf.optimizers.Scipy()
 opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 # Prediction
-query = np.linspace(0, 5, 800)
+query = np.linspace(0, 5, 800).reshape(800, 1)
 
 mean, var = m.predict_f(query)
+
+plt.plot(t, ft)
+plt.scatter(t, y)
+plt.plot(query, mean)
+
+plt.fill_between(
+    query[:, 0],
+    mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
+    mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
+    color="C0",
+    alpha=0.2,
+)
+
+plt.show()
