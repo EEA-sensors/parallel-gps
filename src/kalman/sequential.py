@@ -11,49 +11,62 @@ mm = tf.linalg.matmul
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def kf(m0, P0, Fs, Qs, Hs, Rs, observations, return_loglikelihood=False):
+def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
+    P0, Fs, Qs, H, R = lgssm
+
+    m0 = tf.zeros(P0.shape[0], dtype=P0, device=P0.device)
+
+    @tf.function
     def body(carry, inp):
-        ell, m, P = carry
-        y, F, Q, H, R = inp
-        m = mv(F, m)
-        P = F @ mm(P, F, transpose_b=True) + Q
+        ell, m, P, *_ = carry
+        y, F, Q = inp
+        mp = mv(F, m)
+        Pp = F @ mm(P, F, transpose_b=True) + Q
 
-        S = H @ mm(P, H, transpose_b=True) + R
-        yp = mv(H, m)
-        chol = tf.linalg.cholesky(S)
-        predicted_dist = MultivariateNormalTriL(yp, chol)
-        ell_t = predicted_dist.log_prob(y)
-        Kt = tf.linalg.cholesky_solve(chol, H @ P)
+        def update(m, P, ell):
+            S = H @ mm(P, H, transpose_b=True) + R
+            yp = mv(H, m)
+            chol = tf.linalg.cholesky(S)
+            predicted_dist = MultivariateNormalTriL(yp, chol)
+            ell_t = predicted_dist.log_prob(y)
+            Kt = tf.linalg.cholesky_solve(chol, H @ P)
 
-        m = m + mv(Kt, y - yp, transpose_a=True)
-        P = P - mm(Kt, S, transpose_a=True) @ Kt
-        return ell + ell_t, m, P
+            m = m + mv(Kt, y - yp, transpose_a=True)
+            P = P - mm(Kt, S, transpose_a=True) @ Kt
+            ell = ell + ell_t
+            return ell, m, P
 
-    ells, fms, fPs = tf.scan(body,
-                             (observations, Fs, Qs, Hs, Rs),
-                             (0., m0, P0))
-    if return_loglikelihood:
-        return ells[-1], fms, fPs
-    return fms, fPs
+        nan_y = ~tf.math.is_nan(y)
+        ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: (m, P, ell))
+        return ell, m, P, mp, Pp
+
+    ells, fms, fPs, mps, Pps = tf.scan(body,
+                                       (observations, Fs, Qs),
+                                       (0., m0, P0, m0, P0))
+    returned_values = (fms, fPs) + ((ells[-1],) if return_loglikelihood else ()) + (
+        (mps, Pps) if return_predicted else ())
+    return returned_values
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def ks(Fs, Qs, ms, Ps):
+def ks(lgssm, ms, Ps, mps, Pps, ys):
+    _, Fs, Qs, *_ = lgssm
+
     def body(carry, inp):
-        m, P, F, Q = inp
+        m, P, mp, Pp, F, Q, y = inp
         sm, sP = carry
 
-        pm = mv(F, m)
-        pP = F @ mm(P, F, transpose_b=True) + Q
-
-        chol = tf.linalg.cholesky(pP)
+        chol = tf.linalg.cholesky(Pp)
         Ct = tf.linalg.cholesky_solve(chol, F @ P)
-
-        sm = m + mv(Ct, (sm - pm), transpose_a=True)
-        sP = P + mm(Ct, sP - pP, transpose_a=True) @ Ct
+        y_nan = tf.math.is_nan(y)
+        m_used, P_used = tf.cond(y_nan, lambda: (mp, Pp), lambda: (m, P))
+        sm = m + mv(Ct, sm - m_used, transpose_a=True)
+        sP = P + mm(Ct, sP - P_used, transpose_a=True) @ Ct
         return sm, sP
 
-    (sms, sPs) = tf.scan(body, (Fs[:-1], Qs[:-1], ms[:-1], Ps[:-1]), (ms[-1], Ps[-1]), reverse=True)
+    (sms, sPs) = tf.scan(body,
+                         (Fs[:-1], Qs[:-1], ms[:-1], Ps[:-1], mps[:-1], Pps[:-1], ys[:-1]),
+                         (ms[-1], Ps[-1]), reverse=True)
     sms = tf.concat([sms, tf.expand_dims(ms[-1], 0)], 0)
     sPs = tf.concat([sPs, tf.expand_dims(Ps[-1], 0)], 0)
     return sms, sPs
@@ -61,4 +74,4 @@ def ks(Fs, Qs, ms, Ps):
 
 @partial(tf.function, experimental_relax_shapes=True)
 def kfs(model, observations):
-    return ks(model, *kf(model, observations))
+    return ks(model, *kf(model, observations, return_predicted=True), observations)
