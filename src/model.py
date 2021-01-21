@@ -1,14 +1,13 @@
 import gpflow
-from gpflow import Parameter, config
+import tensorflow as tf
+from gpflow import Parameter
 from gpflow.models import GPModel
 from gpflow.models.model import MeanAndVariance
 from gpflow.models.training_mixins import InputData, RegressionData
 from gpflow.models.util import data_input_to_tensor
-import tensorflow as tf
 
-from src.kalman.parallel import pkf, pks, pkfs
-from src.kalman.sequential import kf, ks, kfs
-from src.kernels.base import SDEKernelMixin
+from src.kalman.parallel import pkf, pkfs
+from src.kalman.sequential import kf, kfs
 
 
 class StateSpaceGP(GPModel):

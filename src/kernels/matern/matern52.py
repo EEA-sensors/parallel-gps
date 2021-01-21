@@ -7,7 +7,7 @@ from src.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
 from src.kernels.matern.common import get_matern_sde
 
 
-class Matern52(SDEKernelMixin, gpflow.kernels.Matern52):
+class Matern52(gpflow.kernels.Matern52, SDEKernelMixin):
     __doc__ = gpflow.kernels.Matern52.__doc__
 
     def get_sde(self) -> ContinuousDiscreteModel:
