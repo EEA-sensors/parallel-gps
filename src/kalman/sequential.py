@@ -13,8 +13,8 @@ mm = tf.linalg.matmul
 @partial(tf.function, experimental_relax_shapes=True)
 def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     P0, Fs, Qs, H, R = lgssm
-
-    m0 = tf.zeros(P0.shape[0], dtype=P0, device=P0.device)
+    dtype = P0.dtype
+    m0 = tf.zeros(P0.shape[0], dtype=dtype)
 
     @tf.function
     def body(carry, inp):
@@ -26,6 +26,7 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
         def update(m, P, ell):
             S = H @ mm(P, H, transpose_b=True) + R
             yp = mv(H, m)
+
             chol = tf.linalg.cholesky(S)
             predicted_dist = MultivariateNormalTriL(yp, chol)
             ell_t = predicted_dist.log_prob(y)
@@ -33,16 +34,17 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
 
             m = m + mv(Kt, y - yp, transpose_a=True)
             P = P - mm(Kt, S, transpose_a=True) @ Kt
+
             ell = ell + ell_t
             return ell, m, P
 
         nan_y = ~tf.math.is_nan(y)
-        ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: (m, P, ell))
+        ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: (ell, m, P))
         return ell, m, P, mp, Pp
 
     ells, fms, fPs, mps, Pps = tf.scan(body,
                                        (observations, Fs, Qs),
-                                       (0., m0, P0, m0, P0))
+                                       (tf.constant(0., dtype), m0, P0, m0, P0))
     returned_values = (fms, fPs) + ((ells[-1],) if return_loglikelihood else ()) + (
         (mps, Pps) if return_predicted else ())
     return returned_values
@@ -53,10 +55,11 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
     _, Fs, Qs, *_ = lgssm
 
     def body(carry, inp):
-        m, P, mp, Pp, F, Q, y = inp
+        F, Q, m, P, mp, Pp, y = inp
         sm, sP = carry
 
         chol = tf.linalg.cholesky(Pp)
+        print(F)
         Ct = tf.linalg.cholesky_solve(chol, F @ P)
         y_nan = tf.math.is_nan(y)
         m_used, P_used = tf.cond(y_nan, lambda: (mp, Pp), lambda: (m, P))
