@@ -33,12 +33,12 @@ cov_func = 'matern32'
 lam = 1 / lengthscale
 
 if cov_func == 'matern12':
-    F = -lam
-    L = 1
+    F = np.array([-lam]).reshape(1, 1)
+    L = np.array(1.).reshape(1, 1)
     D = 1
-    H = 1.
-    m0 = 0
-    P0 = sigma ** 2
+    H = np.array(1.).reshape(1, 1)
+    m0 = np.array(0.).reshape(1, 1)
+    P0 = np.array(sigma ** 2).reshape(1, 1)
 
 elif cov_func == 'matern32':
     F = np.array([[0, 1],
@@ -57,6 +57,10 @@ elif cov_func == 'matern52':
     L = np.array([0, 0, 1]).reshape(3, 1)
     D = 3
     H = np.array([1, 0, 0]).reshape(1, 3)
+    m0 = np.zeros((3,))
+    P0 = np.array([[sigma**2, 0, -1/3*lam**2*sigma**2],
+                   [0, 1/3*lam**2*sigma**2, 0],
+                   [-1/3*lam**2*sigma**2, 0, lam**4*sigma**2]])
 
 q = sigma**2 * (np.math.factorial(D-1)**2 / np.math.factorial(2*D-2)) * (2*lam)**(2*D-1)
 
