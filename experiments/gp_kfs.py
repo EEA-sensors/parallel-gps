@@ -13,10 +13,10 @@ np.random.seed(666)
 
 t = np.sort(np.random.rand(500))
 ft = sinu(t)
-y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
+y = obs_noise(ft, 0.1 * np.eye(t.shape[0]))
 # Init cov function
 cov_func = SSMatern32(variance=1,
-                      lengthscales=0.5)
+                      lengthscales=1)
 
 # Init regression model
 # m = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),
@@ -24,7 +24,7 @@ cov_func = SSMatern32(variance=1,
 #                    mean_function=None)
 m = StateSpaceGP(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),
                  kernel=cov_func,
-                 noise_variance=0.01)
+                 noise_variance=0.1)
 
 # Hyperparas
 # m.likelihood.variance.assign(0.01)
