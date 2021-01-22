@@ -1,11 +1,9 @@
-import numpy as np
 import gpflow as gpf
+import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 
 from src.toymodels import sinu, obs_noise
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 # Generate data
 tf.random.set_seed(666)
@@ -13,14 +11,14 @@ np.random.seed(666)
 
 t = np.linspace(0, 5, 500)
 ft = sinu(t)
-y = obs_noise(ft, 0.01*np.eye(t.shape[0]))
+y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
 
 # Init cov function
 cov_func = gpf.kernels.Matern32()
 
 # Init regression model
-m = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))), 
-                   kernel=cov_func, 
+m = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),
+                   kernel=cov_func,
                    mean_function=None)
 
 # Hyperparas

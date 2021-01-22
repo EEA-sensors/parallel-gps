@@ -1,4 +1,3 @@
-import gpflow
 import tensorflow as tf
 from gpflow import Parameter
 from gpflow.models import GPModel
@@ -42,23 +41,15 @@ class StateSpaceGP(GPModel):
                            tf.cast(tf.ones_like(Xnew), tf.bool)], axis=0)
         all_ts = tf.concat([ts, Xnew], axis=0)
         all_ts_argsort = tf.argsort(all_ts, 0)
-
         all_ts = tf.gather(all_ts, all_ts_argsort, axis=0)
-
         all_ts = tf.reshape(all_ts, (all_ts.shape[0], 1))
 
         all_ys = tf.concat([ys,
                             float("nan") * tf.ones((Xnew.shape[0], ys.shape[1]), dtype=ys.dtype)],
                            axis=0)
-
         sorted_flags = tf.squeeze(tf.gather(flags, all_ts_argsort))
-
         ssm = self._make_model(all_ts)
-
-        tf.print('ssm: \n', ssm)
-
         sms, sPs = self._kf(ssm, all_ys)
-
         return tf.boolean_mask(sms, sorted_flags, 0), tf.boolean_mask(sPs, sorted_flags, 0)
 
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
@@ -66,5 +57,3 @@ class StateSpaceGP(GPModel):
         ssm = self._make_model(ts)
         *_, ll = self._kf(ssm, Y, True)
         return ll
-
-

@@ -3,7 +3,6 @@ Some toy models based on deterministic test functions
 """
 import numpy as np
 
-from typing import Union
 
 def sinu(t: np.ndarray) -> np.ndarray:
     """
@@ -17,9 +16,9 @@ def sinu(t: np.ndarray) -> np.ndarray:
         y:  (n, ) y(t)
     """
     return np.sin(2 * np.pi * t) \
-            + np.sin(4 * np.pi * t) \
-            + np.cos(6 * np.pi * t)
-            
+           + np.sin(4 * np.pi * t) \
+           + np.cos(6 * np.pi * t)
+
 
 def comp_sinu(t: np.ndarray) -> np.ndarray:
     """
@@ -37,8 +36,8 @@ def comp_sinu(t: np.ndarray) -> np.ndarray:
         y:  (n, ) y(t)
     """
     return np.sin(7 * np.pi * np.cos(2 * np.pi * (t ** 2))) ** 2 / \
-            (np.cos(5 * np.pi * t) + 2)
-            
+           (np.cos(5 * np.pi * t) + 2)
+
 
 def rect(t: np.ndarray) -> np.ndarray:
     """
@@ -55,10 +54,10 @@ def rect(t: np.ndarray) -> np.ndarray:
     """
     # Scale to [0, 1]
     tau = (t - np.min(t)) / (np.max(t) - np.min(t))
-    
+
     # Jumping points
-    p = np.linspace(1/6, 5/6, 5)
-    
+    p = np.linspace(1 / 6, 5 / 6, 5)
+
     y = np.zeros(t.shape)
     y[(tau >= 0) & (tau < p[0])] = 0
     y[(tau >= p[0]) & (tau < p[1])] = 1
@@ -66,11 +65,11 @@ def rect(t: np.ndarray) -> np.ndarray:
     y[(tau >= p[2]) & (tau < p[3])] = 0.6
     y[(tau >= p[3]) & (tau < p[4])] = 0
     y[tau >= p[4]] = 0.4
-    
-    return y
-    
 
-def obs_noise(x: np.ndarray, 
+    return y
+
+
+def obs_noise(x: np.ndarray,
               R: np.ndarray) -> np.ndarray:
     """
     Observe data x with Gaussian noises. 

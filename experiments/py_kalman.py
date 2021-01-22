@@ -9,11 +9,11 @@ and initial_state_covariance, ...'
 To compare, we perhaps need to manually put parameters here.
 
 """
-import numpy as np
 import matplotlib.pylab as plt
-
-from scipy.linalg import expm
+import numpy as np
 from pykalman import KalmanFilter
+from scipy.linalg import expm
+
 from src.toymodels import sinu, obs_noise
 
 # Generate data
@@ -22,7 +22,7 @@ np.random.seed(666)
 t = np.linspace(0, 1, 500)
 dt = np.diff(t)[0]
 ft = sinu(t)
-y = obs_noise(ft, 0.01*np.eye(t.shape[0]))
+y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
 
 # GP paras
 lengthscale = 0.1
@@ -42,27 +42,27 @@ if cov_func == 'matern12':
 
 elif cov_func == 'matern32':
     F = np.array([[0, 1],
-                  [-lam**2, -2*lam]])
+                  [-lam ** 2, -2 * lam]])
     L = np.array([0, 1]).reshape(2, 1)
     D = 2
     H = np.array([1, 0]).reshape(1, 2)
-    m0 = np.zeros((2, ))
-    P0 = np.array([[sigma**2, 0],
-                   [0, lam**2*sigma**2]])
+    m0 = np.zeros((2,))
+    P0 = np.array([[sigma ** 2, 0],
+                   [0, lam ** 2 * sigma ** 2]])
 
 elif cov_func == 'matern52':
     F = np.array([[0, 1, 0],
                   [0, 0, 1],
-                  [-lam**3, -3*(lam**2), -3*lam]])
+                  [-lam ** 3, -3 * (lam ** 2), -3 * lam]])
     L = np.array([0, 0, 1]).reshape(3, 1)
     D = 3
     H = np.array([1, 0, 0]).reshape(1, 3)
     m0 = np.zeros((3,))
-    P0 = np.array([[sigma**2, 0, -1/3*lam**2*sigma**2],
-                   [0, 1/3*lam**2*sigma**2, 0],
-                   [-1/3*lam**2*sigma**2, 0, lam**4*sigma**2]])
+    P0 = np.array([[sigma ** 2, 0, -1 / 3 * lam ** 2 * sigma ** 2],
+                   [0, 1 / 3 * lam ** 2 * sigma ** 2, 0],
+                   [-1 / 3 * lam ** 2 * sigma ** 2, 0, lam ** 4 * sigma ** 2]])
 
-q = sigma**2 * (np.math.factorial(D-1)**2 / np.math.factorial(2*D-2)) * (2*lam)**(2*D-1)
+q = sigma ** 2 * (np.math.factorial(D - 1) ** 2 / np.math.factorial(2 * D - 2)) * (2 * lam) ** (2 * D - 1)
 
 A = expm(F * dt)
 n = F.shape[0]

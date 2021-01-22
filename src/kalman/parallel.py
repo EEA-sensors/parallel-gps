@@ -1,6 +1,6 @@
+import math
 from functools import partial
 
-import math
 import tensorflow as tf
 from tensorflow_probability.python.distributions import MultivariateNormalFullCovariance
 from tensorflow_probability.python.math import scan_associative

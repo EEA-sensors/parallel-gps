@@ -10,7 +10,7 @@ ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L",
 
 
 class SDEKernelMixin(metaclass=abc.ABCMeta):
-    def __init__(self, t0: float= 0.):
+    def __init__(self, t0: float = 0.):
         """
 
         Parameters:
@@ -48,7 +48,7 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         lgssm: ContinuousDiscreteModel
             The associated state space model
         """
-        dtype= config.default_float()
+        dtype = config.default_float()
         sde = self.get_sde()
         n = sde.F.shape[0]
         t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))
@@ -63,15 +63,7 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
              tf.concat([zeros, -tf.transpose(sde.F)], axis=1)],
             axis=0)
 
-        # n = size(F, 1);
-        # Phi = [F L * Q * L'; zeros(n,n) -F'];
-        # AB = expm(Phi * dt) * [zeros(n, n);
-        #                        eye(n)];
-        # Q = AB(1:n,:)*A; % A' = inv(AB((n + 1):(2 * n),:));
-
         AB = tf.linalg.expm(dts * tf.expand_dims(Phi, 0))
-        tf.print(AB)
         AB = AB @ tf.concat([zeros, tf.eye(n, dtype=dtype)], axis=0)
-        tf.print(AB)
         Qs = tf.matmul(AB[:, :n, :], Fs, transpose_b=True)
         return LGSSM(sde.P0, Fs, Qs, sde.H, R)

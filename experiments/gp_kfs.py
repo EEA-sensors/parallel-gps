@@ -1,14 +1,11 @@
-import numpy as np
 import gpflow as gpf
+import matplotlib.pyplot as plt
+import numpy as np
 import tensorflow as tf
 
-from src.toymodels import sinu, obs_noise
 from src.kernels.matern import Matern32 as SSMatern32
 from src.model import StateSpaceGP
-
-
-import numpy as np
-import matplotlib.pyplot as plt
+from src.toymodels import sinu, obs_noise
 
 # Generate data
 tf.random.set_seed(666)
@@ -16,7 +13,7 @@ np.random.seed(666)
 
 t = np.sort(np.random.rand(500))
 ft = sinu(t)
-y = obs_noise(ft, 0.01*np.eye(t.shape[0]))
+y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
 
 # Init cov function
 cov_func = SSMatern32(variance=1,
@@ -53,7 +50,5 @@ print(mean)
 plt.plot(t, ft, c='k')
 plt.scatter(t, y, c='r')
 plt.plot(query, mean[:, 0], c='g')
-
-
 
 plt.show()

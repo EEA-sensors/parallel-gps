@@ -10,7 +10,6 @@ from src.kernels.matern.common import get_matern_sde
 class Matern32(gpflow.kernels.Matern32, SDEKernelMixin):
     __doc__ = gpflow.kernels.Matern32.__doc__
 
-
     def get_sde(self) -> ContinuousDiscreteModel:
         F, L, H, Q = get_matern_sde(self.variance, self.lengthscales, 2)
         lengthscales = tf.reduce_sum(self.lengthscales)
