@@ -14,7 +14,6 @@ np.random.seed(666)
 t = np.sort(np.random.rand(500))
 ft = sinu(t)
 y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
-
 # Init cov function
 cov_func = SSMatern32(variance=1,
                       lengthscales=0.5)
@@ -45,10 +44,8 @@ query = np.sort(np.random.rand(800)).reshape(800, 1)
 
 mean, var = m.predict_f(query)
 
-print(mean)
-
 plt.plot(t, ft, c='k')
 plt.scatter(t, y, c='r')
-plt.plot(query, mean[:, 0], c='g')
+plt.plot(query.squeeze(), mean[:, 0], c='g')
 
 plt.show()

@@ -34,12 +34,13 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
 
             m = m + mv(Kt, y - yp, transpose_a=True)
             P = P - mm(Kt, S, transpose_a=True) @ Kt
-
             ell = ell + ell_t
             return ell, m, P
 
         nan_y = ~tf.math.is_nan(y)
-        ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: (ell, m, P))
+        nan_res = (ell, m, P)
+        ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: nan_res)
+
         return ell, m, P, mp, Pp
 
     ells, fms, fPs, mps, Pps = tf.scan(body,
@@ -59,7 +60,6 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
         sm, sP = carry
 
         chol = tf.linalg.cholesky(Pp)
-        print(F)
         Ct = tf.linalg.cholesky_solve(chol, F @ P)
         y_nan = tf.math.is_nan(y)
         m_used, P_used = tf.cond(y_nan, lambda: (mp, Pp), lambda: (m, P))
