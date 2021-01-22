@@ -10,7 +10,7 @@ from src.kalman.parallel import pkf, pkfs
 from src.kalman.sequential import kf, kfs
 
 
-@tf.function
+@tf.function(experimental_relax_shapes=True)
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -22,7 +22,8 @@ def _merge_sorted(a, b, *args):
     b: tf.Tensor
         Sorted tensor for ordering
     args: list of tuple of tf.Tensor
-        Some data ordered according to a and b that need to be merged whilst keeping the order.
+            Some data ordered according to a and b that need to be merged whilst keeping the order.
+
 
     Returns
     -------
@@ -32,12 +33,12 @@ def _merge_sorted(a, b, *args):
     """
 
     assert len(a.shape) == len(b.shape) == 1
-    a_shape, b_shape = a.shape[0], b.shape[0]
-    c_len = a_shape + b_shape
+    a_shape, b_shape = tf.shape(a)[0], tf.shape(b)[0]
+    c_len = tf.shape(a)[0] + tf.shape(b)[0]
     if a_shape < b_shape:
         a, b = b, a
+        a_shape, b_shape = tf.shape(a)[0], tf.shape(b)[0]
         args = tuple((j, i) for i, j in args)
-        a_shape, b_shape = a.shape[0], b.shape[0]
     b_indices = tf.range(b_shape, dtype=tf.int32) + tf.searchsorted(a, b)
     a_indices = tf.ones((c_len,), dtype=tf.bool)
     a_indices = tf.tensor_scatter_nd_update(a_indices, b_indices[:, None], tf.zeros_like(b_indices, tf.bool))
@@ -45,11 +46,9 @@ def _merge_sorted(a, b, *args):
     a_mask = tf.boolean_mask(c_range, a_indices)[:, None]
 
     def _inner_merge(u, v):
-        c = tf.zeros((c_len,) + u.shape[1:], dtype=u.dtype)
+        c = tf.concat([u, v], 0)
         c = tf.tensor_scatter_nd_update(c, b_indices[:, None], v)
-        c = tf.tensor_scatter_nd_update(c,
-                                        a_mask,
-                                        u)
+        c = tf.tensor_scatter_nd_update(c, a_mask, u)
         return c
 
     return (_inner_merge(a, b),) + tuple(_inner_merge(i, j) for i, j in args)
