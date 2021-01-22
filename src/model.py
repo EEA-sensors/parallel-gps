@@ -10,7 +10,7 @@ from src.kalman.parallel import pkf, pkfs
 from src.kalman.sequential import kf, kfs
 
 
-# @tf.function
+@tf.function
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -92,7 +92,7 @@ class StateSpaceGP(GPModel):
         #  this merging is equivalent to using argsort but uses O(log(T)^2) operations instead.
 
         ssm = self._make_model(all_ts[:, None])
-        sms, sPs = self._kf(ssm, all_ys)
+        sms, sPs = self._kfs(ssm, all_ys)
         return tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
 
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
