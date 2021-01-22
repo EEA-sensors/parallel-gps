@@ -1,2 +1,2 @@
-from .deter_funcs import *
+from .data_funcs import *
 from .gp_samples import *

@@ -7,21 +7,23 @@ import tensorflow as tf
 from scipy.special import binom
 
 
-def _get_transition_matrix(lamda, d, dtype) -> tf.Tensor:
+@tf.function
+def _get_transition_matrix(lamda: tf.Tensor, d: int, dtype: tf.DType) -> tf.Tensor:
     F = tf.linalg.diag(tf.ones((d - 1,), dtype=dtype), k=1, num_cols=d, num_rows=d)
     binomial_coeffs = binom(d, np.arange(0, d, dtype=int)).astype(dtype)
-    binomial_coeffs = tf.convert_to_tensor(binomial_coeffs)
+    binomial_coeffs = tf.convert_to_tensor(binomial_coeffs, dtype=dtype)
     lambda_powers = lamda ** np.arange(d, 0, -1, dtype=dtype)
     update_indices = [[d - 1, k] for k in range(d)]
     F = tf.tensor_scatter_nd_sub(F, update_indices, lambda_powers * binomial_coeffs)
     return F
 
 
-def _get_brownian_cov(variance, lengthscales, d, dtype) -> tf.Tensor:
-    q = (2 * lengthscales) ** (2 * d - 1) * variance * math.factorial(d - 1) ** 2 / math.factorial(2 * d - 2)
+def _get_brownian_cov(variance, lamda, d, dtype) -> tf.Tensor:
+    q = (2 * lamda) ** (2 * d - 1) * variance * math.factorial(d - 1) ** 2 / math.factorial(2 * d - 2)
     return q * tf.eye(1, dtype=dtype)
 
 
+@tf.function
 def get_matern_sde(variance, lengthscales, d) -> Tuple[tf.Tensor, ...]:
     """
     TODO: write description
@@ -45,5 +47,5 @@ def get_matern_sde(variance, lengthscales, d) -> Tuple[tf.Tensor, ...]:
     one = tf.ones((1,), dtype)
     L = tf.linalg.diag(one, k=-d + 1, num_rows=d, num_cols=1)  # type: tf.Tensor
     H = tf.linalg.diag(one, num_rows=1, num_cols=d)  # type: tf.Tensor
-    Q = _get_brownian_cov(variance, lengthscales, d, dtype)
+    Q = _get_brownian_cov(variance, lamda, d, dtype)
     return F, L, H, Q

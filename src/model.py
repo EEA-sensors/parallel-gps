@@ -89,7 +89,6 @@ class StateSpaceGP(GPModel):
                                                   (tf.zeros_like(squeezed_ts, dtype=tf.bool),
                                                    tf.ones_like(squeezed_Xnew, dtype=tf.bool)))
         #  this merging is equivalent to using argsort but uses O(log(T)^2) operations instead.
-
         ssm = self._make_model(all_ts[:, None])
         sms, sPs = self._kfs(ssm, all_ys)
         return tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)

@@ -79,4 +79,4 @@ def obs_noise(x: np.ndarray,
         x: (n, )
         R: (n, n)
     """
-    return x + np.linalg.cholesky(R) @ np.random.randn(x.shape[0])
+    return x + np.sqrt(R) * np.random.randn(x.shape[0])

@@ -13,10 +13,11 @@ class Matern52(gpflow.kernels.Matern52, SDEKernelMixin):
     def get_sde(self) -> ContinuousDiscreteModel:
         F, L, H, Q = get_matern_sde(self.variance, self.lengthscales, 3)
         lengthscales = tf.reduce_sum(self.lengthscales)
-        lamda = math.sqrt(3) / lengthscales
+        lamda = math.sqrt(5) / lengthscales
         variance = tf.reduce_sum(self.variance)
 
         temp = lamda ** 2 * variance
         P_infty = tf.linalg.diag([variance, temp / 3, temp ** 2])
         P_infty = tf.tensor_scatter_nd_sub(P_infty, [[0, 2], [2, 0]], [temp / 3, temp / 3])
+        tf.print(P_infty)
         return ContinuousDiscreteModel(P_infty, F, L, H, Q)

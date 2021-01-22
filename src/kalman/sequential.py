@@ -38,7 +38,7 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
             return ell, m, P
 
         nan_y = ~tf.math.is_nan(y)
-        nan_res = (ell, m, P)
+        nan_res = (ell, mp, Pp)
         ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: nan_res)
 
         return ell, m, P, mp, Pp
@@ -61,14 +61,12 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
 
         chol = tf.linalg.cholesky(Pp)
         Ct = tf.linalg.cholesky_solve(chol, F @ P)
-        y_nan = tf.math.is_nan(y)
-        m_used, P_used = tf.cond(y_nan, lambda: (mp, Pp), lambda: (m, P))
-        sm = m + mv(Ct, sm - m_used, transpose_a=True)
-        sP = P + mm(Ct, sP - P_used, transpose_a=True) @ Ct
+        sm = m + mv(Ct, sm - mp, transpose_a=True)
+        sP = P + mm(Ct, sP - Pp, transpose_a=True) @ Ct
         return sm, sP
 
     (sms, sPs) = tf.scan(body,
-                         (Fs[:-1], Qs[:-1], ms[:-1], Ps[:-1], mps[1:], Pps[1:], ys[:-1]),
+                         (Fs[1:], Qs[1:], ms[:-1], Ps[:-1], mps[1:], Pps[1:], ys[1:]),
                          (ms[-1], Ps[-1]), reverse=True)
     sms = tf.concat([sms, tf.expand_dims(ms[-1], 0)], 0)
     sPs = tf.concat([sPs, tf.expand_dims(Ps[-1], 0)], 0)
