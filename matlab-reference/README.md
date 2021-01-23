@@ -2,7 +2,7 @@
 
 These are some Simo's reference codes how to implement certain state space forms of covariances. The important ones are:
 
-* `maunaloa_demo.m` -- Run Mauna Loa CO2 demo with Kalman filter
+* `maunaloa_demo.m` -- Run Mauna Loa CO2 demo with Kalman filter. 
 * `maunaloa_test1.m` -- Test/demo Mauna Loa compound state-space model
 * `se_to_ss_test1.m` -- Test/demo squared exponential state-space model
 * `matern_to_ss_test1.m` -- Test/demo Matern state-space model
@@ -14,4 +14,5 @@ These are some Simo's reference codes how to implement certain state space forms
 * `ss_spec.m` -- Evaluate state-space model 
 * `lti_disc.m` -- Well
 
+There are also datas for Mauna Loa demo in the folder, but more recent ones should be downloaded from here: ftp://ftp.cmdl.noaa.gov/ccg/co2/trends/
 
