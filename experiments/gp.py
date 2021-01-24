@@ -30,8 +30,6 @@ opt = gpf.optimizers.Scipy()
 opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 # Prediction
-print(cov_func.variance)
-print(cov_func.lengthscales)
 query = np.linspace(0, 1, 800).reshape(800, 1)
 
 mean, var = m.predict_f(query)
