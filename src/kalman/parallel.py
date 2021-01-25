@@ -15,48 +15,70 @@ mm = tf.linalg.matmul
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     m1 = mv(F, m0)
     P1 = F @ mm(P0, F, transpose_b=True) + Q
-    S1 = H @ mm(P1, H, transpose_b=True) + R
-    S1_chol = tf.linalg.cholesky(S1)
-    K1t = tf.linalg.cholesky_solve(S1_chol, H @ P1)
 
-    A = tf.zeros_like(F)
-    b = m1 + mv(K1t, y - mv(H, m1), transpose_a=True)
-    C = P1 - mm(K1t, S1, transpose_a=True) @ K1t
+    def _res_nan():
+        A = F
+        b = m1
+        C = P1
+        eta = tf.zeros_like(y)
+        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        return A, b, C, J, eta
 
-    S = H @ mm(Q, H, transpose_b=True) + R
-    chol = tf.linalg.cholesky(S)
-    HF = H @ F
-    eta = mv(HF,
-             tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
-             transpose_a=True)
-    J = mm(HF, tf.linalg.cholesky_solve(chol, H @ F), transpose_a=True)
-    return A, b, C, J, eta
+    def _res_not_nan():
+        S1 = H @ mm(P1, H, transpose_b=True) + R
+        S1_chol = tf.linalg.cholesky(S1)
+        K1t = tf.linalg.cholesky_solve(S1_chol, H @ P1)
+
+        A = tf.zeros_like(F)
+        b = m1 + mv(K1t, y - mv(H, m1), transpose_a=True)
+        C = P1 - mm(K1t, S1, transpose_a=True) @ K1t
+
+        S = H @ mm(Q, H, transpose_b=True) + R
+        chol = tf.linalg.cholesky(S)
+        HF = H @ F
+        eta = mv(HF,
+                 tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
+                 transpose_a=True)
+        J = mm(HF, tf.linalg.cholesky_solve(chol, H @ F), transpose_a=True)
+        return A, b, C, J, eta
+
+    return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 
 @partial(tf.function, experimental_relax_shapes=True)
 def generic_filtering_element(F, Q, H, R, y):
-    S = H @ mm(Q, H, transpose_b=True) + R
-    chol = tf.linalg.cholesky(S)
+    def _res_nan():
+        A = F
+        b = tf.zeros(F.shape[0], dtype=F.dtype)
+        C = Q
+        eta = tf.zeros_like(y)
+        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        return A, b, C, J, eta
 
-    Kt = tf.linalg.cholesky_solve(chol, H @ Q)
-    A = F - mm(Kt, H, transpose_a=True) @ F
-    b = mv(Kt, y, transpose_a=True)
-    C = Q - mm(Kt, H, transpose_a=True) @ Q
+    def _res_not_nan():
+        S = H @ mm(Q, H, transpose_b=True) + R
+        chol = tf.linalg.cholesky(S)
 
-    HF = H @ F
-    eta = mv(HF,
-             tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
-             transpose_a=True)
+        Kt = tf.linalg.cholesky_solve(chol, H @ Q)
+        A = F - mm(Kt, H, transpose_a=True) @ F
+        b = mv(Kt, y, transpose_a=True)
+        C = Q - mm(Kt, H, transpose_a=True) @ Q
 
-    J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
-    return A, b, C, J, eta
+        HF = H @ F
+        eta = mv(HF,
+                 tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
+                 transpose_a=True)
 
+        J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
+        return A, b, C, J, eta
+
+    return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 @partial(tf.function, experimental_relax_shapes=True)
-def make_associative_filtering_elements(m0, P0, Fs, Qs, Hs, Rs, observations):
-    first_elems = first_filtering_element(m0, P0, Fs[0], Qs[0], Hs[0], Rs[0], observations[0])
-    generic_elems = tf.vectorized_map(lambda z: generic_filtering_element(*z),
-                                      (Fs, Qs, Hs, Rs, observations), fallback_to_while_loop=False)
+def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
+    first_elems = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
+    generic_elems = tf.vectorized_map(lambda z: generic_filtering_element(z[0], z[1], H, R, z[2]),
+                                      (Fs, Qs, observations), fallback_to_while_loop=False)
     return tuple(tf.concat([tf.expand_dims(first_e, 0), gen_es], 0)
                  for first_e, gen_es in zip(first_elems, generic_elems))
 
@@ -83,8 +105,12 @@ def filtering_operator(elems):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pkf(m0, P0, Fs, Qs, Hs, Rs, observations, return_loglikelihood=False, max_parallel=10000):
-    initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, Hs, Rs, observations)
+def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
+    P0, Fs, Qs, H, R = lgssm
+    dtype = P0.dtype
+    m0 = tf.zeros(P0.shape[0], dtype=dtype)
+
+    initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
     def vectorized_operator(a, b):
         return tf.vectorized_map(filtering_operator, (a, b), fallback_to_while_loop=False)
@@ -95,8 +121,8 @@ def pkf(m0, P0, Fs, Qs, Hs, Rs, observations, return_loglikelihood=False, max_pa
     if return_loglikelihood:
         predicted_means = tf.concat([[m0], final_elements[1][:-1]], axis=0)
         predicted_covs = mm(Fs, mm(tf.concat([[P0], final_elements[2][:-1]], axis=0), Fs, transpose_b=True)) + Qs
-        obs_means = mm(Hs, predicted_means)
-        obs_covs = mm(Hs, mm(predicted_covs, Hs, transpose_b=True))
+        obs_means = mm(H, predicted_means)
+        obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True))
         dists = MultivariateNormalFullCovariance(obs_means, obs_covs)
         logprobs = dists.log_prob(observations)
         return tf.reduce_sum(logprobs), final_elements[1], final_elements[2]
@@ -143,7 +169,8 @@ def smoothing_operator(elems):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pks(Fs, Qs, ms, Ps, max_parallel=10000):
+def pks(lgssm, ms, Ps, max_parallel=10000):
+    _, Fs, Qs, *_ = lgssm
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)
 
@@ -158,4 +185,5 @@ def pks(Fs, Qs, ms, Ps, max_parallel=10000):
 
 @partial(tf.function, experimental_relax_shapes=True)
 def pkfs(model, observations, max_parallel=10000):
-    return pks(model, *pkf(model, observations, max_parallel), max_parallel)
+    fms, fPs = pkf(model, observations, False, max_parallel)
+    return pks(model, fms, fPs, max_parallel)
