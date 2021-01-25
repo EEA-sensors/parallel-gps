@@ -14,7 +14,7 @@ mm = tf.linalg.matmul
 def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
-    m0 = tf.zeros(P0.shape[0], dtype=dtype)
+    m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
 
     @tf.function
     def body(carry, inp):

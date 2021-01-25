@@ -12,7 +12,7 @@ ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L",
 @tf.function(experimental_relax_shapes=True)
 def _get_ssm(sde, ts, R, t0=0.):
     dtype = config.default_float()
-    n = sde.F.shape[0]
+    n = tf.shape(sde.F)[0]
     t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))
 
     ts = tf.concat([t0, ts], axis=0)

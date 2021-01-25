@@ -1,3 +1,5 @@
+from functools import partial
+
 import tensorflow as tf
 from gpflow import Parameter
 from gpflow.models import GPModel
@@ -59,7 +61,8 @@ class StateSpaceGP(GPModel):
                  data: RegressionData,
                  kernel,
                  noise_variance: float = 1.0,
-                 parallel=False
+                 parallel=False,
+                 max_parallel=5000
                  ):
         self._noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
@@ -69,8 +72,8 @@ class StateSpaceGP(GPModel):
             self._kf = kf
             self._kfs = kfs
         else:
-            self._kf = pkf
-            self._kfs = pkfs
+            self._kf = partial(pkf, max_parallel=max_parallel)
+            self._kfs = partial(pkfs, max_parallel=max_parallel)
 
     def _make_model(self, ts):
         R = tf.reshape(self._noise_variance, (1, 1))
@@ -88,7 +91,7 @@ class StateSpaceGP(GPModel):
                                                   (ys, float_ys),
                                                   (tf.zeros_like(squeezed_ts, dtype=tf.bool),
                                                    tf.ones_like(squeezed_Xnew, dtype=tf.bool)))
-        #  this merging is equivalent to using argsort but uses O(log(T)^2) operations instead.
+        #  this merging is equivalent to using argsort but uses O(log(T)) operations instead.
         ssm = self._make_model(all_ts[:, None])
         sms, sPs = self._kfs(ssm, all_ys)
         return tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)

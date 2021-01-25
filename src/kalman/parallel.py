@@ -2,7 +2,7 @@ import math
 from functools import partial
 
 import tensorflow as tf
-from tensorflow_probability.python.distributions import MultivariateNormalFullCovariance
+from tensorflow_probability.python.distributions import MultivariateNormalTriL
 from tensorflow_probability.python.math import scan_associative
 
 __all__ = ["pkf", "pks", "pkfs"]
@@ -74,11 +74,12 @@ def generic_filtering_element(F, Q, H, R, y):
 
     return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
+
 @partial(tf.function, experimental_relax_shapes=True)
 def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
     first_elems = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
     generic_elems = tf.vectorized_map(lambda z: generic_filtering_element(z[0], z[1], H, R, z[2]),
-                                      (Fs, Qs, observations), fallback_to_while_loop=False)
+                                      (Fs[1:], Qs[1:], observations[1:]), fallback_to_while_loop=False)
     return tuple(tf.concat([tf.expand_dims(first_e, 0), gen_es], 0)
                  for first_e, gen_es in zip(first_elems, generic_elems))
 
@@ -105,7 +106,7 @@ def filtering_operator(elems):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
+def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=3000):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
     m0 = tf.zeros(P0.shape[0], dtype=dtype)
@@ -121,11 +122,15 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
     if return_loglikelihood:
         predicted_means = tf.concat([[m0], final_elements[1][:-1]], axis=0)
         predicted_covs = mm(Fs, mm(tf.concat([[P0], final_elements[2][:-1]], axis=0), Fs, transpose_b=True)) + Qs
-        obs_means = mm(H, predicted_means)
-        obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True))
-        dists = MultivariateNormalFullCovariance(obs_means, obs_covs)
+        obs_means = mv(H, predicted_means)
+        obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True)) + tf.expand_dims(R, 0)
+        dists = MultivariateNormalTriL(obs_means, tf.linalg.cholesky(obs_covs))
+        # TODO: some logic could be added here to avoid diagonalizing the covariance of non-nan models
         logprobs = dists.log_prob(observations)
-        return tf.reduce_sum(logprobs), final_elements[1], final_elements[2]
+        logprobs_without_nans = tf.where(tf.math.is_nan(logprobs),
+                                         tf.zeros_like(logprobs),
+                                         logprobs)
+        return final_elements[1], final_elements[2], tf.reduce_sum(logprobs_without_nans)
     return final_elements[1], final_elements[2]
 
 
@@ -169,7 +174,7 @@ def smoothing_operator(elems):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pks(lgssm, ms, Ps, max_parallel=10000):
+def pks(lgssm, ms, Ps, max_parallel=3000):
     _, Fs, Qs, *_ = lgssm
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)
@@ -184,6 +189,6 @@ def pks(lgssm, ms, Ps, max_parallel=10000):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pkfs(model, observations, max_parallel=10000):
+def pkfs(model, observations, max_parallel=3000):
     fms, fPs = pkf(model, observations, False, max_parallel)
     return pks(model, fms, fPs, max_parallel)
