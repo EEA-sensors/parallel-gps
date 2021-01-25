@@ -13,22 +13,6 @@ from src.model import StateSpaceGP
 from src.toymodels import sinu, obs_noise
 
 
-# def tf_function(func=None,
-#                  input_signature=None,
-#                  autograph=True,
-#                  experimental_implements=None,
-#                  experimental_autograph_options=None,
-#                  experimental_relax_shapes=False,
-#                  experimental_compile=None,
-#                  experimental_follow_type_hints=None):
-#     if func is not None:
-#         return func
-#     else:
-#         return lambda x: x
-#
-# tf.function = tf_function
-
-
 class GPEquivalenceTest(unittest.TestCase):
 
     def setUp(self):
