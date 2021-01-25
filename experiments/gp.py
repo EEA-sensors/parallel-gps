@@ -9,7 +9,7 @@ from src.toymodels import sinu, obs_noise
 tf.random.set_seed(666)
 np.random.seed(666)
 
-t = np.linspace(0, 5, 500)
+t = np.sort(np.random.rand(500))
 ft = sinu(t)
 y = obs_noise(ft, 0.01 * np.eye(t.shape[0]))
 
@@ -30,13 +30,13 @@ opt = gpf.optimizers.Scipy()
 opt_logs = opt.minimize(m.training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 # Prediction
-query = np.linspace(0, 5, 800).reshape(800, 1)
+query = np.linspace(0, 1, 800).reshape(800, 1)
 
 mean, var = m.predict_f(query)
 
-plt.plot(t, ft)
-plt.scatter(t, y)
-plt.plot(query, mean)
+plt.plot(t, ft, c="k")
+# plt.scatter(t, y, c="r")
+plt.plot(query, mean, c="g")
 
 plt.fill_between(
     query[:, 0],
@@ -45,5 +45,5 @@ plt.fill_between(
     color="C0",
     alpha=0.2,
 )
-
+plt.suptitle("GP")
 plt.show()

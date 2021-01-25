@@ -9,6 +9,28 @@ from src.kalman.base import LGSSM
 ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L", "H", "Q"])
 
 
+@tf.function(experimental_relax_shapes=True)
+def _get_ssm(sde, ts, R, t0=0.):
+    dtype = config.default_float()
+    n = sde.F.shape[0]
+    t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))
+
+    ts = tf.concat([t0, ts], axis=0)
+    dts = tf.reshape(ts[1:] - ts[:-1], (-1, 1, 1))
+    Fs = tf.linalg.expm(dts * tf.expand_dims(sde.F, 0))
+    zeros = tf.zeros_like(sde.F)
+
+    Phi = tf.concat(
+        [tf.concat([sde.F, sde.L @ tf.matmul(sde.Q, sde.L, transpose_b=True)], axis=1),
+         tf.concat([zeros, -tf.transpose(sde.F)], axis=1)],
+        axis=0)
+
+    AB = tf.linalg.expm(dts * tf.expand_dims(Phi, 0))
+    AB = AB @ tf.concat([zeros, tf.eye(n, dtype=dtype)], axis=0)
+    Qs = tf.matmul(AB[:, :n, :], Fs, transpose_b=True)
+    return LGSSM(sde.P0, Fs, Qs, sde.H, R)
+
+
 class SDEKernelMixin(metaclass=abc.ABCMeta):
     def __init__(self, t0: float = 0.):
         """
@@ -48,22 +70,5 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         lgssm: ContinuousDiscreteModel
             The associated state space model
         """
-        dtype = config.default_float()
-        sde = self.get_sde()
-        n = sde.F.shape[0]
-        t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))
-
-        ts = tf.concat([t0, ts], axis=0)
-        dts = tf.reshape(ts[1:] - ts[:-1], (-1, 1, 1))
-        Fs = tf.linalg.expm(dts * tf.expand_dims(sde.F, 0))
-        zeros = tf.zeros_like(sde.F)
-
-        Phi = tf.concat(
-            [tf.concat([sde.F, sde.L @ tf.matmul(sde.Q, sde.L, transpose_b=True)], axis=1),
-             tf.concat([zeros, -tf.transpose(sde.F)], axis=1)],
-            axis=0)
-
-        AB = tf.linalg.expm(dts * tf.expand_dims(Phi, 0))
-        AB = AB @ tf.concat([zeros, tf.eye(n, dtype=dtype)], axis=0)
-        Qs = tf.matmul(AB[:, :n, :], Fs, transpose_b=True)
-        return LGSSM(sde.P0, Fs, Qs, sde.H, R)
+        ssm = _get_ssm(self.get_sde(), ts, R, t0)
+        return ssm

@@ -1,14 +1,13 @@
 import math
+from typing import Tuple
 
 import gpflow
 import tensorflow as tf
 
 from src.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
-from src.kernels.matern.common import get_matern_sde
 
-
-class Matern52(gpflow.kernels.Matern52, SDEKernelMixin):
-    __doc__ = gpflow.kernels.Matern52.__doc__
+class RBF(gpflow.kernels.RBF, SDEKernelMixin):
+    __doc__ = gpflow.kernels.RBF.__doc__
 
     def get_sde(self) -> ContinuousDiscreteModel:
         F, L, H, Q = get_matern_sde(self.variance, self.lengthscales, 3)
@@ -20,3 +19,8 @@ class Matern52(gpflow.kernels.Matern52, SDEKernelMixin):
         P_infty = tf.linalg.diag([variance, temp / 3, temp ** 2])
         P_infty = tf.tensor_scatter_nd_sub(P_infty, [[0, 2], [2, 0]], [temp / 3, temp / 3])
         return ContinuousDiscreteModel(P_infty, F, L, H, Q)
+
+    def get_rbf_sde(variance,
+                    lengthscales,
+                    order) -> Tuple[tf.Tensor, ...]:
+        pass

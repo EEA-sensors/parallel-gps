@@ -2,51 +2,69 @@
 Numerically test if GP reg has the same results with KFS
 """
 
+import time
+import unittest
+import numpy.testing as npt
+
 import gpflow as gpf
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from src.kernels.matern import Matern32 as SSMatern32
+from src.kernels.matern import Matern12, Matern32, Matern52
 from src.model import StateSpaceGP
 from src.toymodels import sinu, obs_noise
 
-# Generate data
-tf.random.set_seed(666)
-np.random.seed(666)
 
-t = np.sort(np.random.rand(500))
-ft = sinu(t)
-y = obs_noise(ft, 0.1 * np.eye(t.shape[0]))
+class GPEquivalenceTest(unittest.TestCase):
 
-# Init cov functions
-ss_cov = SSMatern32(variance=1,
-                    lengthscales=0.5)
+    def setUp(self) -> None:
+        self.T = 2000
+        self.K = 800
+        self.t = np.sort(np.random.rand(self.T))
+        self.ft = sinu(self.t)
+        self.y = obs_noise(self.ft, 0.1 * np.eye(1))
 
-gp_cov = gpf.kernels.Matern32(variance=1,
-                              lengthscales=0.5)
+        self.covs = (Matern12(variance=1, lengthscales=0.5),
+                     Matern32(variance=1, lengthscales=0.5),
+                     Matern52(variance=1, lengthscales=0.5))
 
-gp_model = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),
-                          kernel=gp_cov,
-                          noise_variance=0.1,
-                          mean_function=None)
-ss_model = StateSpaceGP(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),
-                        kernel=ss_cov,
-                        noise_variance=0.1)
+    def test_loglikelihood(self):
 
-# Prediction
-query = np.sort(np.random.rand(800)).reshape(800, 1)
+        for cov in self.covs:
 
-# Precition from GP
-mean_gp, var_gp = gp_model.predict_f(query)
+            gp_model = gpf.models.GPR(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                                      kernel=cov,
+                                      noise_variance=0.1,
+                                      mean_function=None)
 
-# Precition from KFS
-mean_ss, var_ss = ss_model.predict_f(query)
+            ss_model = StateSpaceGP(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                                    kernel=cov,
+                                    noise_variance=0.1)
 
-print('Abs error: {}'.format(tf.reduce_sum(tf.abs(mean_gp, mean_ss))))
+            npt.assert_almost_equal(gp_model.log_marginal_likelihood(),
+                                    ss_model.maximum_log_likelihood_objective(),
+                                    decimal=6)
 
-plt.plot(query, mean_gp, c='k', label='GP')
-plt.plot(query, mean_ss[:, 0], c='r', label='KFS')
-plt.legend()
-plt.show()
+    def test_posterior(self):
 
+        for cov in self.covs:
+
+            gp_model = gpf.models.GPR(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                                      kernel=cov,
+                                      noise_variance=0.1,
+                                      mean_function=None)
+
+            ss_model = StateSpaceGP(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                                    kernel=cov,
+                                    noise_variance=0.1)
+
+            query = np.sort(np.random.rand(self.K)).reshape(self.K, 1)
+
+            mean_gp, var_gp = gp_model.predict_f(query)
+
+            mean_ss, var_ss = ss_model.predict_f(query)
+
+            npt.assert_array_almost_equal(mean_gp[:, 0], mean_ss[:, 0], decimal=8)
+
+if __name__ == '__main__':
+    unittest.main()
