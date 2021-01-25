@@ -15,42 +15,64 @@ mm = tf.linalg.matmul
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     m1 = mv(F, m0)
     P1 = F @ mm(P0, F, transpose_b=True) + Q
-    S1 = H @ mm(P1, H, transpose_b=True) + R
-    S1_chol = tf.linalg.cholesky(S1)
-    K1t = tf.linalg.cholesky_solve(S1_chol, H @ P1)
 
-    A = tf.zeros_like(F)
-    b = m1 + mv(K1t, y - mv(H, m1), transpose_a=True)
-    C = P1 - mm(K1t, S1, transpose_a=True) @ K1t
+    def _res_nan():
+        A = F
+        b = m1
+        C = P1
+        eta = tf.zeros_like(y)
+        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        return A, b, C, J, eta
 
-    S = H @ mm(Q, H, transpose_b=True) + R
-    chol = tf.linalg.cholesky(S)
-    HF = H @ F
-    eta = mv(HF,
-             tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
-             transpose_a=True)
-    J = mm(HF, tf.linalg.cholesky_solve(chol, H @ F), transpose_a=True)
-    return A, b, C, J, eta
+    def _res_not_nan():
+        S1 = H @ mm(P1, H, transpose_b=True) + R
+        S1_chol = tf.linalg.cholesky(S1)
+        K1t = tf.linalg.cholesky_solve(S1_chol, H @ P1)
+
+        A = tf.zeros_like(F)
+        b = m1 + mv(K1t, y - mv(H, m1), transpose_a=True)
+        C = P1 - mm(K1t, S1, transpose_a=True) @ K1t
+
+        S = H @ mm(Q, H, transpose_b=True) + R
+        chol = tf.linalg.cholesky(S)
+        HF = H @ F
+        eta = mv(HF,
+                 tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
+                 transpose_a=True)
+        J = mm(HF, tf.linalg.cholesky_solve(chol, H @ F), transpose_a=True)
+        return A, b, C, J, eta
+
+    return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 
 @partial(tf.function, experimental_relax_shapes=True)
 def generic_filtering_element(F, Q, H, R, y):
-    S = H @ mm(Q, H, transpose_b=True) + R
-    chol = tf.linalg.cholesky(S)
+    def _res_nan():
+        A = F
+        b = tf.zeros(F.shape[0], dtype=F.dtype)
+        C = Q
+        eta = tf.zeros_like(y)
+        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        return A, b, C, J, eta
 
-    Kt = tf.linalg.cholesky_solve(chol, H @ Q)
-    A = F - mm(Kt, H, transpose_a=True) @ F
-    b = mv(Kt, y, transpose_a=True)
-    C = Q - mm(Kt, H, transpose_a=True) @ Q
+    def _res_not_nan():
+        S = H @ mm(Q, H, transpose_b=True) + R
+        chol = tf.linalg.cholesky(S)
 
-    HF = H @ F
-    eta = mv(HF,
-             tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
-             transpose_a=True)
+        Kt = tf.linalg.cholesky_solve(chol, H @ Q)
+        A = F - mm(Kt, H, transpose_a=True) @ F
+        b = mv(Kt, y, transpose_a=True)
+        C = Q - mm(Kt, H, transpose_a=True) @ Q
 
-    J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
-    return A, b, C, J, eta
+        HF = H @ F
+        eta = mv(HF,
+                 tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
+                 transpose_a=True)
 
+        J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
+        return A, b, C, J, eta
+
+    return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 @partial(tf.function, experimental_relax_shapes=True)
 def make_associative_filtering_elements(m0, P0, Fs, Qs, Hs, Rs, observations):
