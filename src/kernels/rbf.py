@@ -47,12 +47,11 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         ell_vec = lengthscales ** tf.range(dim, 0, -1, dtype=dtype)
         # F[-1, :] = F[-1, :] / ell_vec
-        # F = tf.concat([F[:-1, :], F[None, -1, :] / ell_vec], axis=0)
-        print(F)
         update_indices = [[dim - 1, k] for k in range(dim)]
-        tf.compat.v1.scatter_nd_update(F, update_indices, F[-1, :] / ell_vec)
-        # H[0] = H[0] / (lengthscales ** dim)
+        F = tf.tensor_scatter_nd_sub(F, update_indices, F[-1, :] / ell_vec)
         print(F)
+        # H[0] = H[0] / (lengthscales ** dim)
+        tf.tensor_scatter_nd_sub(H, update_indices, lengthscales ** dim)
         q = variance * lengthscales * q
 
         F, L, H, q = self._balance_ss(F, L, H, q)
