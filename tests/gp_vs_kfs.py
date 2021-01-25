@@ -43,7 +43,10 @@ mean_gp, var_gp = gp_model.predict_f(query)
 # Precition from KFS
 mean_ss, var_ss = ss_model.predict_f(query)
 
+print('Abs error: {}'.format(tf.reduce_sum(tf.abs(mean_gp, mean_ss))))
+
 plt.plot(query, mean_gp, c='k', label='GP')
 plt.plot(query, mean_ss[:, 0], c='r', label='KFS')
 plt.legend()
 plt.show()
+
