@@ -24,7 +24,7 @@ def _get_brownian_cov(variance, lamda, d, dtype) -> tf.Tensor:
 
 
 @tf.function
-def get_matern_sde(variance, lengthscales, d) -> Tuple[tf.Tensor, ...]:
+def get_matern_sde(variance, lengthscales, d: int) -> Tuple[tf.Tensor, ...]:
     """
     TODO: write description
 
@@ -44,7 +44,6 @@ def get_matern_sde(variance, lengthscales, d) -> Tuple[tf.Tensor, ...]:
     dtype = config.default_float()
     lamda = math.sqrt(2 * d - 1) / lengthscales
     F = _get_transition_matrix(lamda, d, dtype)
-    print(F)
     one = tf.ones((1,), dtype)
     L = tf.linalg.diag(one, k=-d + 1, num_rows=d, num_cols=1)  # type: tf.Tensor
     H = tf.linalg.diag(one, num_rows=1, num_cols=d)  # type: tf.Tensor

@@ -7,6 +7,7 @@ import unittest
 import gpflow as gpf
 import numpy as np
 import numpy.testing as npt
+import tensorflow as tf
 
 from src.kernels.matern import Matern12, Matern32, Matern52
 from src.model import StateSpaceGP
@@ -20,21 +21,22 @@ class GPEquivalenceTest(unittest.TestCase):
         self.K = 800
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
-        self.y = obs_noise(self.ft, 0.1 * np.eye(1))
-
+        self.y = obs_noise(self.ft, 0.1)
         self.covs = (Matern12(variance=1, lengthscales=0.5),
                      Matern32(variance=1, lengthscales=0.5),
                      Matern52(variance=1, lengthscales=0.5))
 
+        self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
+
     def test_loglikelihood(self):
         for cov in self.covs:
-            gp_model = gpf.models.GPR(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+            gp_model = gpf.models.GPR(data=self.data,
                                       kernel=cov,
                                       noise_variance=0.1,
                                       mean_function=None)
             gp_model_ll = gp_model.log_marginal_likelihood()
             for parallel in [False, True]:
-                ss_model = StateSpaceGP(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
                                         parallel=parallel)
@@ -44,15 +46,15 @@ class GPEquivalenceTest(unittest.TestCase):
                                         decimal=6)
 
     def test_posterior(self):
-        query = np.sort(np.random.rand(self.K)).reshape(self.K, 1)
+        query = tf.constant(np.sort(np.random.rand(self.K, 1), 0))
         for cov in self.covs:
-            gp_model = gpf.models.GPR(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+            gp_model = gpf.models.GPR(data=self.data,
                                       kernel=cov,
                                       noise_variance=0.1,
                                       mean_function=None)
             mean_gp, var_gp = gp_model.predict_f(query)
             for parallel in [False, True]:
-                ss_model = StateSpaceGP(data=(np.reshape(self.t, (self.T, 1)), np.reshape(self.y, (self.T, 1))),
+                ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
                                         parallel=parallel)

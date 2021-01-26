@@ -17,8 +17,8 @@ t = np.sort(np.random.rand(T))
 ft = sinu(t)
 y = obs_noise(ft, 0.01 * np.eye(1))
 # Init cov function
-cov_func = SSMatern32(variance=1,
-                      lengthscales=1)
+cov_func = SSMatern32(variance=1.,
+                      lengthscales=1.)
 
 # Init regression model
 # m = gpf.models.GPR(data=(np.reshape(t, (500, 1)), np.reshape(y, (500, 1))),

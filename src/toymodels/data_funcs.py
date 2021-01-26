@@ -70,7 +70,7 @@ def rect(t: np.ndarray) -> np.ndarray:
 
 
 def obs_noise(x: np.ndarray,
-              R: np.ndarray) -> np.ndarray:
+              r: float) -> np.ndarray:
     """
     Observe data x with Gaussian noises. 
     y = x + r,   r ~ N(0, R)
@@ -79,4 +79,4 @@ def obs_noise(x: np.ndarray,
         x: (n, )
         R: (n, n)
     """
-    return x + np.sqrt(R) * np.random.randn(x.shape[0])
+    return x + np.sqrt(r) * np.random.randn(x.shape[0])
