@@ -17,14 +17,14 @@ from src.toymodels import sinu, obs_noise
 class GPEquivalenceTest(unittest.TestCase):
 
     def setUp(self):
-        self.T = 2000
-        self.K = 800
+        self.T = 100
+        self.K = 50
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
         self.y = obs_noise(self.ft, 0.1)
-        self.covs = (Matern12(variance=1, lengthscales=0.5),
-                     Matern32(variance=1, lengthscales=0.5),
-                     Matern52(variance=1, lengthscales=0.5))
+        self.covs = (Matern12(variance=1., lengthscales=0.5),
+                     Matern32(variance=1., lengthscales=0.5),
+                     Matern52(variance=1., lengthscales=0.5))
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
@@ -39,7 +39,7 @@ class GPEquivalenceTest(unittest.TestCase):
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
-                                        parallel=parallel)
+                                        parallel=parallel, max_parallel=2 * (self.T + self.K))
                 ss_model_ll = ss_model.maximum_log_likelihood_objective()
                 npt.assert_almost_equal(gp_model_ll,
                                         ss_model_ll,
@@ -57,7 +57,8 @@ class GPEquivalenceTest(unittest.TestCase):
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
-                                        parallel=parallel)
+                                        parallel=parallel,
+                                        max_parallel=2 * (self.T + self.K))
                 mean_ss, var_ss = ss_model.predict_f(query)
                 npt.assert_array_almost_equal(mean_gp[:, 0], mean_ss[:, 0], decimal=8)
 

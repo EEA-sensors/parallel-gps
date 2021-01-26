@@ -99,5 +99,5 @@ class StateSpaceGP(GPModel):
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
         ts, Y = self.data
         ssm = self._make_model(ts)
-        *_, ll = self._kf(ssm, Y, True)
+        fms, fPs, ll = self._kf(ssm, Y, True)
         return ll

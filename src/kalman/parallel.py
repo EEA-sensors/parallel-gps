@@ -13,25 +13,23 @@ mm = tf.linalg.matmul
 
 @partial(tf.function, experimental_relax_shapes=True)
 def first_filtering_element(m0, P0, F, Q, H, R, y):
-    m1 = mv(F, m0)
-    P1 = F @ mm(P0, F, transpose_b=True) + Q
-
     def _res_nan():
-        A = F
-        b = m1
-        C = P1
-        eta = tf.zeros_like(y)
-        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        A = tf.zeros_like(F)
+        b = m0
+        C = P0
+        eta = tf.zeros_like(m0)
+        J = tf.zeros_like(F)
+
         return A, b, C, J, eta
 
     def _res_not_nan():
-        S1 = H @ mm(P1, H, transpose_b=True) + R
+        S1 = H @ mm(P0, H, transpose_b=True) + R
         S1_chol = tf.linalg.cholesky(S1)
-        K1t = tf.linalg.cholesky_solve(S1_chol, H @ P1)
+        K1t = tf.linalg.cholesky_solve(S1_chol, H @ P0)
 
         A = tf.zeros_like(F)
-        b = m1 + mv(K1t, y - mv(H, m1), transpose_a=True)
-        C = P1 - mm(K1t, S1, transpose_a=True) @ K1t
+        b = m0 + mv(K1t, y - mv(H, m0), transpose_a=True)
+        C = P0 - mm(K1t, S1, transpose_a=True) @ K1t
 
         S = H @ mm(Q, H, transpose_b=True) + R
         chol = tf.linalg.cholesky(S)
@@ -40,6 +38,7 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
                  tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
                  transpose_a=True)
         J = mm(HF, tf.linalg.cholesky_solve(chol, H @ F), transpose_a=True)
+
         return A, b, C, J, eta
 
     return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
@@ -49,10 +48,11 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
 def generic_filtering_element(F, Q, H, R, y):
     def _res_nan():
         A = F
-        b = tf.zeros(F.shape[0], dtype=F.dtype)
+        b = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
         C = Q
-        eta = tf.zeros_like(y)
-        J = tf.zeros((y.shape[0], y.shape[0]), dtype=y.dtype)
+        eta = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
+        J = tf.zeros_like(F)
+
         return A, b, C, J, eta
 
     def _res_not_nan():
@@ -70,6 +70,7 @@ def generic_filtering_element(F, Q, H, R, y):
                  transpose_a=True)
 
         J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
+
         return A, b, C, J, eta
 
     return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
@@ -90,7 +91,7 @@ def filtering_operator(elems):
 
     A1, b1, C1, J1, eta1 = elem1
     A2, b2, C2, J2, eta2 = elem2
-    dim = A1.shape[0]
+    dim = tf.shape(A1)[0]
     I = tf.eye(dim, dtype=A1.dtype)
 
     temp = tf.linalg.solve(I + C1 @ J2, tf.transpose(A2), adjoint=True)
@@ -106,10 +107,11 @@ def filtering_operator(elems):
 
 
 @partial(tf.function, experimental_relax_shapes=True)
-def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=3000):
+def pkf(lgssm, observations, return_loglikelihood=False,
+        max_parallel: int = 3000):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
-    m0 = tf.zeros(P0.shape[0], dtype=dtype)
+    m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
 
     initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
@@ -120,12 +122,14 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=3000):
                                       initial_elements,
                                       max_num_levels=math.ceil(math.log2(max_parallel)))
     if return_loglikelihood:
-        predicted_means = tf.concat([[m0], final_elements[1][:-1]], axis=0)
-        predicted_covs = mm(Fs, mm(tf.concat([[P0], final_elements[2][:-1]], axis=0), Fs, transpose_b=True)) + Qs
+        filtered_means = tf.concat([tf.expand_dims(m0, 0), final_elements[1][:-1]], axis=0)
+        filtered_cov = tf.concat([tf.expand_dims(P0, 0), final_elements[2][:-1]], axis=0)
+        predicted_means = mv(Fs, filtered_means)
+        predicted_covs = mm(Fs, mm(filtered_cov, Fs, transpose_b=True)) + Qs
         obs_means = mv(H, predicted_means)
         obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True)) + tf.expand_dims(R, 0)
         dists = MultivariateNormalTriL(obs_means, tf.linalg.cholesky(obs_covs))
-        # TODO: some logic could be added here to avoid diagonalizing the covariance of non-nan models
+        # TODO: some logic could be added here to avoid handling the covariance of non-nan models, but no impact for GPs
         logprobs = dists.log_prob(observations)
         logprobs_without_nans = tf.where(tf.math.is_nan(logprobs),
                                          tf.zeros_like(logprobs),
