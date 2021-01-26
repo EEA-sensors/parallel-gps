@@ -75,4 +75,5 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
 
 @partial(tf.function, experimental_relax_shapes=True)
 def kfs(model, observations):
-    return ks(model, *kf(model, observations, return_predicted=True), observations)
+    fms, fPs, mps, Pps = kf(model, observations, return_predicted=True)
+    return ks(model, fms, fPs, mps, Pps, observations)

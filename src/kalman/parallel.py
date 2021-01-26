@@ -146,7 +146,6 @@ def last_smoothing_element(m, P):
 @partial(tf.function, experimental_relax_shapes=True)
 def generic_smoothing_element(F, Q, m, P):
     Pp = F @ mm(P, F, transpose_b=True) + Q
-
     chol = tf.linalg.cholesky(Pp)
     E = tf.transpose(tf.linalg.cholesky_solve(chol, F @ P))
     g = m - mv(E @ F, m)
@@ -158,7 +157,7 @@ def generic_smoothing_element(F, Q, m, P):
 def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covariances):
     last_elems = last_smoothing_element(filtering_means[-1], filtering_covariances[-1])
     generic_elems = tf.vectorized_map(lambda z: generic_smoothing_element(*z),
-                                      (Fs[:-1], Qs[:-1], filtering_means[:-1], filtering_covariances[:-1]),
+                                      (Fs[1:], Qs[1:], filtering_means[:-1], filtering_covariances[:-1]),
                                       fallback_to_while_loop=False)
     return tuple(tf.concat([gen_es, tf.expand_dims(last_e, 0)], axis=0)
                  for gen_es, last_e in zip(generic_elems, last_elems))

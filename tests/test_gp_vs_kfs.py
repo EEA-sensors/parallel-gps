@@ -28,6 +28,7 @@ class GPEquivalenceTest(unittest.TestCase):
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
+    @unittest.skip
     def test_loglikelihood(self):
         for cov in self.covs:
             gp_model = gpf.models.GPR(data=self.data,
