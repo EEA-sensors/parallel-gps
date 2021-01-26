@@ -38,6 +38,8 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         Parameters:
         -----------
         t0: float, optional
+        rbf_order : int, default=6
+            The order of Taylor expansion for RBF covariance function in state-space
         """
         self.t0 = t0
 

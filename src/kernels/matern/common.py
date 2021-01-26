@@ -23,7 +23,6 @@ def _get_brownian_cov(variance, lamda, d, dtype) -> tf.Tensor:
     return q * tf.eye(1, dtype=dtype)
 
 
-@tf.function
 def get_matern_sde(variance, lengthscales, d: int) -> Tuple[tf.Tensor, ...]:
     """
     TODO: write description

@@ -5,20 +5,28 @@ import gpflow
 import numpy as np
 import tensorflow as tf
 import gpflow.config as config
+from functools import wraps
 
 from src.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+
 
 class RBF(gpflow.kernels.RBF, SDEKernelMixin):
     __doc__ = gpflow.kernels.RBF.__doc__
 
+    def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
+        self._order = kwargs.pop('order', 3)
+        super().__init__(variance, lengthscales, **kwargs)
+
+    __init__.__doc__ = r"""TODO: talk about order params \n\n""" + gpflow.kernels.RBF.__init__.__doc__
+
     def get_sde(self) -> ContinuousDiscreteModel:
-        F, L, H, Q, Pinf = self.get_rbf_sde(self.variance, self.lengthscales)
+        F, L, H, Q, Pinf = self.get_rbf_sde(self.variance, self.lengthscales, self._order)
         return ContinuousDiscreteModel(Pinf, F, L, H, Q)
 
     def get_rbf_sde(self,
                     variance,
                     lengthscales,
-                    order = 6) -> Tuple[tf.Tensor, ...]:
+                    order=6) -> Tuple[tf.Tensor, ...]:
         """Get RBF SDE coefficients
 
         Parameters
@@ -35,13 +43,13 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         F, L, H, Q : tf.Tensor
             SDE coefficients.
         """
-        _F, _L, _H, _q = self._get_unscaled_rbf_sde(order)
+        F_, L_, H_, q_ = self._get_unscaled_rbf_sde(order)
 
         dtype = config.default_float()
-        F = tf.convert_to_tensor(_F, dtype=dtype)
-        L = tf.convert_to_tensor(_L, dtype=dtype)
-        H = tf.convert_to_tensor(_H, dtype=dtype)
-        q = tf.convert_to_tensor(_q, dtype=dtype)
+        F = tf.convert_to_tensor(F_, dtype=dtype)
+        L = tf.convert_to_tensor(L_, dtype=dtype)
+        H = tf.convert_to_tensor(H_, dtype=dtype)
+        q = tf.convert_to_tensor(q_, dtype=dtype)
 
         dim = F.shape[0]
 
@@ -58,7 +66,6 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         q = tf.reshape(q, (1, 1))
 
         return F, L, H, q, Pinf
-
 
     def _get_unscaled_rbf_sde(self,
                               order: int = 6) -> Tuple[np.ndarray, ...]:
@@ -80,7 +87,7 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         se_to_ss.m
         """
         B = np.sqrt(2 * np.pi)
-        A = np.zeros((2 * order + 1, ))
+        A = np.zeros((2 * order + 1,))
 
         i = 0
         for k in range(order, -1, -1):
@@ -151,13 +158,12 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         Q = L @ tf.transpose(L) * q
 
-        Pinf = tf.reshape(-tf.linalg.solve(F1 + F2, tf.reshape(Q, (dim**2, 1))),
+        Pinf = tf.reshape(-tf.linalg.solve(F1 + F2, tf.reshape(Q, (dim ** 2, 1))),
                           (dim, dim))
 
         Pinf = 0.5 * (Pinf + tf.transpose(Pinf))
 
         return Pinf
-
 
     def _balance_ss(self,
                     F: tf.Tensor,
@@ -197,7 +203,7 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         for k in range(iter):
             for i in range(dim):
                 tmp = F[:, i]
-                tmp = tf.tensor_scatter_nd_update(tmp, [[i]], tf.zeros((1, ), dtype=dtype))
+                tmp = tf.tensor_scatter_nd_update(tmp, [[i]], tf.zeros((1,), dtype=dtype))
                 c = tf.norm(tmp)
                 tmp2 = F[i, :]
                 tmp2 = tf.tensor_scatter_nd_update(tmp2, [[i]], tf.zeros((1,), dtype=dtype))

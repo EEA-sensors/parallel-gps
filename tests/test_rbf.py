@@ -1,3 +1,4 @@
+import unittest
 import numpy.testing as npt
 
 import gpflow as gpf
@@ -9,45 +10,85 @@ from src.kernels import RBF
 from src.model import StateSpaceGP
 from src.toymodels import sinu, obs_noise
 
-# Generate data
-tf.random.set_seed(666)
-np.random.seed(666)
 
-T = 200
-K = 600
-t = np.linspace(0, 1, T)
-ft = sinu(t)
-y = obs_noise(ft, 0.1 * np.eye(1))
+class RBFTest(unittest.TestCase):
 
-cov_func = RBF(variance=1.,
-               lengthscales=0.1)
+    def setUp(self):
+        self.T = 2000
+        self.K = 800
+        self.t = np.sort(np.random.rand(self.T))
+        self.ft = sinu(self.t)
+        self.y = obs_noise(self.ft, 0.01)
 
-# Init regression model
-m = StateSpaceGP(data=(np.reshape(t, (T, 1)), np.reshape(y, (T, 1))),
-                 kernel=cov_func,
-                 noise_variance=0.1,
-                 parallel=False)
+        self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
-# Hyperpara opt
-opt = gpf.optimizers.Scipy()
-opt_logs = opt.minimize(m._training_loss, m.trainable_variables, options=dict(maxiter=100))
+        rbf_order = 3
+        self.cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
 
-# Prediction
-query = np.linspace(0, 1, K).reshape(K, 1)
+    def test_sde_coefficients(self):
+        F_expected = np.array([[0, 14.520676967550859, 0],
+                               [0, 0, 32.857489440296360],
+                               [-14.5210953665873, -29.4746060478111, -50.3678777987092]])
 
-mean, var = m.predict_f(query)
+        L_expected = np.array([0., 0., 1.]).reshape(3, 1)
 
-plt.plot(t, ft, c='k')
-# plt.scatter(t, y, c='r')
-plt.plot(query.squeeze(), mean[:, 0], c='g')
+        H_expected = np.array([1., 0., 0.]).reshape(1, 3)
 
-plt.fill_between(
-    query[:, 0],
-    mean[:, 0] - 1.96 * np.sqrt(var[:, 0, 0]),
-    mean[:, 0] + 1.96 * np.sqrt(var[:, 0, 0]),
-    color="C0",
-    alpha=0.2,
-)
-plt.suptitle("SSGP")
+        Q_expected = 52.8553179255264
 
-plt.show()
+        Pinf_expected = np.array([[1.04502531824891, -1.41636387123970e-17, -0.301281550265743],
+                                  [-1.41636387123970e-17, 0.681741999944955, -1.70331397804495e-17],
+                                  [-0.301281550265743, -1.70331397804495e-17, 0.611552410634913]])
+
+        Pinf, F, L, H, Q = self.cov.get_sde()
+
+        npt.assert_almost_equal(F, F_expected, decimal=8)
+        npt.assert_almost_equal(L, L_expected, decimal=8)
+        npt.assert_almost_equal(H, H_expected, decimal=8)
+        npt.assert_almost_equal(Q, Q_expected, decimal=8)
+        npt.assert_almost_equal(Pinf, Pinf_expected, decimal=8)
+
+    def test_loglikelihood(self):
+        rbf_order = 12
+        cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
+
+        gp_model = gpf.models.GPR(data=self.data,
+                                  kernel=cov,
+                                  noise_variance=0.1,
+                                  mean_function=None)
+        gp_model_ll = gp_model.log_marginal_likelihood()
+        for parallel in [False, True]:
+            ss_model = StateSpaceGP(data=self.data,
+                                    kernel=cov,
+                                    noise_variance=0.1,
+                                    parallel=parallel)
+            ss_model_ll = ss_model.maximum_log_likelihood_objective()
+            npt.assert_allclose(gp_model_ll,
+                                ss_model_ll,
+                                atol=1e-3,
+                                rtol=1e-3)
+
+    def test_posterior(self):
+        rbf_order = 12
+        cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
+
+        query = np.sort(np.random.rand(self.K)).reshape(self.K, 1)
+
+        gp_model = gpf.models.GPR(data=self.data,
+                                  kernel=cov,
+                                  noise_variance=0.1,
+                                  mean_function=None)
+        mean_gp, var_gp = gp_model.predict_f(query)
+
+        for parallel in [False, True]:
+            ss_model = StateSpaceGP(data=self.data,
+                                    kernel=cov,
+                                    noise_variance=0.1,
+                                    parallel=parallel)
+            mean_ss, var_ss = ss_model.predict_f(query)
+
+            npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0], atol=1e-3, rtol=1e-3)
+
+
+if __name__ == '__main__':
+    unittest.main()
