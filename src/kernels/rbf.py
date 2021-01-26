@@ -106,10 +106,10 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         F[:-1, 1:] = np.eye(GA.size - 2)
 
         L = np.zeros((GA.size - 1, 1))
-        L[-1] = 1
+        L[-1, 0] = 1
 
         H = np.zeros((1, GA.size - 1))
-        H[0] = GB
+        H[0, 0] = GB
 
         return F, L, H, q
 
@@ -151,8 +151,7 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         Q = L @ tf.transpose(L) * q
 
-        chol = tf.linalg.cholesky(F1 + F2)
-        Pinf = tf.reshape(-tf.linalg.cholesky_solve(chol, tf.reshape(Q, (dim**2, 1))),
+        Pinf = tf.reshape(-tf.linalg.solve(F1 + F2, tf.reshape(Q, (dim**2, 1))),
                           (dim, dim))
 
         Pinf = 0.5 * (Pinf + tf.transpose(Pinf))
@@ -219,10 +218,10 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         tmp3 = tf.reduce_max(tf.abs(L))
         L = L / tmp3
-        q = tmp3 ** 2 * q
+        q = (tmp3 ** 2) * q
 
         tmp4 = tf.reduce_max(tf.abs(H))
         H = H / tmp4
-        q = tmp4 ** 2 * q
+        q = (tmp4 ** 2) * q
 
         return F, L, H, q

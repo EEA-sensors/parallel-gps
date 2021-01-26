@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from src.kernels import RBF, Matern52
+from src.kernels import RBF
 from src.model import StateSpaceGP
 from src.toymodels import sinu, obs_noise
 
@@ -13,26 +13,27 @@ from src.toymodels import sinu, obs_noise
 tf.random.set_seed(666)
 np.random.seed(666)
 
-T = 100
-K = 200
-t = np.linspace(0, 10, T)
+T = 200
+K = 600
+t = np.linspace(0, 1, T)
 ft = sinu(t)
 y = obs_noise(ft, 0.1 * np.eye(1))
 
-cov_func = Matern52(variance=1.,
+cov_func = RBF(variance=1.,
                lengthscales=0.1)
 
 # Init regression model
 m = StateSpaceGP(data=(np.reshape(t, (T, 1)), np.reshape(y, (T, 1))),
                  kernel=cov_func,
-                 noise_variance=0.1)
+                 noise_variance=0.1,
+                 parallel=False)
 
 # Hyperpara opt
 opt = gpf.optimizers.Scipy()
 opt_logs = opt.minimize(m._training_loss, m.trainable_variables, options=dict(maxiter=100))
 
 # Prediction
-query = np.linspace(0, 10, K).reshape(K, 1)
+query = np.linspace(0, 1, K).reshape(K, 1)
 
 mean, var = m.predict_f(query)
 
