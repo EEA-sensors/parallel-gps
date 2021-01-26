@@ -2,8 +2,8 @@
 % Testing routine for squared exponential -- just plot covariances
 %
 
-    s = 2;
-    ell = 0.5;
+    s = 1;
+    ell = 0.1;
     n = 6;
     
     se_spec = @(w) s^2 * sqrt(2*pi) * ell * exp(-ell^2 * w.^2/2);
