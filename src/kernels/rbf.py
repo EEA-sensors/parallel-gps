@@ -46,17 +46,16 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         dim = F.shape[0]
 
         ell_vec = lengthscales ** tf.range(dim, 0, -1, dtype=dtype)
-        # F[-1, :] = F[-1, :] / ell_vec
         update_indices = [[dim - 1, k] for k in range(dim)]
-        F = tf.tensor_scatter_nd_sub(F, update_indices, F[-1, :] / ell_vec)
-        print(F)
-        # H[0] = H[0] / (lengthscales ** dim)
-        tf.tensor_scatter_nd_sub(H, update_indices, lengthscales ** dim)
+        F = tf.tensor_scatter_nd_update(F, update_indices, F[-1, :] / ell_vec)
+        H = H / (lengthscales ** dim)
         q = variance * lengthscales * q
 
         F, L, H, q = self._balance_ss(F, L, H, q)
 
         Pinf = self._solve_lyap_vec(F, L, q)
+
+        q = tf.reshape(q, (1, 1))
 
         return F, L, H, q, Pinf
 
@@ -90,10 +89,8 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         q = B / np.polyval(A, 0)
 
-        LB = np.real(B / ((1j) ** np.arange(B.size - 1, -1, -1)))
         LA = np.real(A / ((1j) ** np.arange(A.size - 1, -1, -1)))
 
-        BR = np.roots(LB)
         AR = np.roots(LA)
 
         GB = 1
@@ -143,19 +140,19 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         dim = F.shape[0]
 
         # Plan A
-        F1 = tf.experimental.numpy.kron(tf.eye(dim, dtype=dtype), F)
-        F2 = tf.experimental.numpy.kron(F, tf.eye(dim, dtype=dtype))
+        # F1 = tf.experimental.numpy.kron(tf.eye(dim, dtype=dtype), F)
+        # F2 = tf.experimental.numpy.kron(F, tf.eye(dim, dtype=dtype))
 
         # Plan B
-        op1 = tf.linalg.LinearOperator(F)
-        op2 = tf.linalg.LinearOperator(tf.eye(dim, dtype=dtype))
+        op1 = tf.linalg.LinearOperatorFullMatrix(F)
+        op2 = tf.linalg.LinearOperatorFullMatrix(tf.eye(dim, dtype=dtype))
         F1 = tf.linalg.LinearOperatorKronecker([op2, op1]).to_dense()
         F2 = tf.linalg.LinearOperatorKronecker([op1, op2]).to_dense()
 
         Q = L @ tf.transpose(L) * q
 
-        ch = tf.linalg.cholesky(F1 + F2)
-        Pinf = tf.reshape(tf.linalg.cholesky_solve(-ch, tf.reshape(Q, (dim**2, 1))),
+        chol = tf.linalg.cholesky(F1 + F2)
+        Pinf = tf.reshape(-tf.linalg.cholesky_solve(chol, tf.reshape(Q, (dim**2, 1))),
                           (dim, dim))
 
         Pinf = 0.5 * (Pinf + tf.transpose(Pinf))
@@ -187,6 +184,10 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         Returns
         -------
         Tuple[tf.Tensor]
+
+        References
+        ----------
+        https://arxiv.org/pdf/1401.5766.pdf
         """
         dtype = config.default_float()
 
@@ -197,17 +198,24 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
         for k in range(iter):
             for i in range(dim):
                 tmp = F[:, i]
-                tmp[i] = 0
+                tmp = tf.tensor_scatter_nd_update(tmp, [[i]], tf.zeros((1, ), dtype=dtype))
                 c = tf.norm(tmp)
                 tmp2 = F[i, :]
-                tmp2[i] = 0
+                tmp2 = tf.tensor_scatter_nd_update(tmp2, [[i]], tf.zeros((1,), dtype=dtype))
                 r = tf.norm(tmp2)
-                f = np.sqrt(r / c)
-                D[i, i] = f * D[i, i]
-                F[:, i] = f * F[:, i]
-                F[i, :] = F[i, :] / f
-                L[i, :] = L[i, :] / f
-                H[:, i] = f * H[:, i]
+                f = tf.sqrt(r / c)
+
+                D = tf.tensor_scatter_nd_update(D, [[i, i]], f * D[None, i, i])
+
+                update_indices = [[k, i] for k in range(dim)]
+                F = tf.tensor_scatter_nd_update(F, update_indices, f * F[:, i])
+
+                update_indices = [[i, k] for k in range(dim)]
+                F = tf.tensor_scatter_nd_update(F, update_indices, F[i, :] / f)
+
+                L = tf.tensor_scatter_nd_update(L, [[i, 0]], L[i, :] / f)
+
+                H = tf.tensor_scatter_nd_update(H, [[0, i]], f * H[:, i])
 
         tmp3 = tf.reduce_max(tf.abs(L))
         L = L / tmp3

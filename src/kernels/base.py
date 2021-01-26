@@ -11,6 +11,7 @@ ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L",
 
 @tf.function(experimental_relax_shapes=True)
 def _get_ssm(sde, ts, R, t0=0.):
+    tf.print(sde)
     dtype = config.default_float()
     n = tf.shape(sde.F)[0]
     t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))

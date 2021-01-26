@@ -12,6 +12,7 @@ mm = tf.linalg.matmul
 
 @partial(tf.function, experimental_relax_shapes=True)
 def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
+    tf.print(lgssm)
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
     m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
