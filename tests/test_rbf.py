@@ -1,13 +1,10 @@
 import unittest
-import warnings
 
-import gpflow as gpf
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
 
 from pssgp.kernels import RBF
-from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
 
 
@@ -48,62 +45,6 @@ class RBFTest(unittest.TestCase):
         npt.assert_almost_equal(H, H_expected, decimal=8)
         npt.assert_almost_equal(Q, Q_expected, decimal=8)
         npt.assert_almost_equal(Pinf, Pinf_expected, decimal=8)
-
-    def test_loglikelihood(self):
-        rbf_order = 12
-        cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
-        check_grad_vars = cov.trainable_variables
-        gp_model = gpf.models.GPR(data=self.data,
-                                  kernel=cov,
-                                  noise_variance=0.1,
-                                  mean_function=None)
-        with tf.GradientTape() as tape:
-            tape.watch(check_grad_vars)
-            gp_model_ll = gp_model.maximum_log_likelihood_objective()
-        gp_model_grad = tape.gradient(gp_model_ll, check_grad_vars)
-        for parallel in [False, True]:
-            ss_model = StateSpaceGP(data=self.data,
-                                    kernel=cov,
-                                    noise_variance=0.1,
-                                    parallel=parallel)
-            with tf.GradientTape() as tape:
-                tape.watch(check_grad_vars)
-                ss_model_ll = ss_model.maximum_log_likelihood_objective()
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                # this is due to a slight theoretical incompatibility between scan_associative
-                # and experimental_relax_shapes compilation option, but this  no biggie.
-                ss_model_grad = tape.gradient(ss_model_ll, check_grad_vars)
-            npt.assert_allclose(gp_model_ll,
-                                ss_model_ll,
-                                atol=1e-3,
-                                rtol=1e-3)
-            for gp_grad, ss_grad in zip(gp_model_grad, ss_model_grad):
-                npt.assert_allclose(gp_grad,
-                                    ss_grad,
-                                    atol=1e-2,
-                                    rtol=1e-2)
-
-    def test_posterior(self):
-        rbf_order = 12
-        cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
-
-        query = np.sort(np.random.rand(self.K)).reshape(self.K, 1)
-
-        gp_model = gpf.models.GPR(data=self.data,
-                                  kernel=cov,
-                                  noise_variance=0.1,
-                                  mean_function=None)
-        mean_gp, var_gp = gp_model.predict_f(query)
-
-        for parallel in [False, True]:
-            ss_model = StateSpaceGP(data=self.data,
-                                    kernel=cov,
-                                    noise_variance=0.1,
-                                    parallel=parallel)
-            mean_ss, var_ss = ss_model.predict_f(query)
-
-            npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0], atol=1e-3, rtol=1e-3)
 
 
 if __name__ == '__main__':

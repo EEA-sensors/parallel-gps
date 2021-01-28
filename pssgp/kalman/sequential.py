@@ -10,7 +10,7 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
@@ -50,7 +50,7 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     return returned_values
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def ks(lgssm, ms, Ps, mps, Pps, ys):
     _, Fs, Qs, *_ = lgssm
 
@@ -72,7 +72,7 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
     return sms, sPs
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def kfs(model, observations):
     fms, fPs, mps, Pps = kf(model, observations, return_predicted=True)
     return ks(model, fms, fPs, mps, Pps, observations)

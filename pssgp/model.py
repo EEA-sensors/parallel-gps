@@ -75,8 +75,9 @@ class StateSpaceGP(GPModel):
             self._kfs = pkfs
 
     def _make_model(self, ts):
-        R = tf.reshape(self._noise_variance, (1, 1))
-        ssm = self.kernel.get_ssm(ts, R)
+        with tf.name_scope("make_model"):
+            R = tf.reshape(self._noise_variance, (1, 1))
+            ssm = self.kernel.get_ssm(ts, R)
         return ssm
 
     def predict_f(
