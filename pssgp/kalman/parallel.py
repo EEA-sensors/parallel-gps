@@ -1,6 +1,6 @@
 import math
 from functools import partial
-
+import warnings
 import tensorflow as tf
 from tensorflow_probability.python.distributions import MultivariateNormalTriL
 from tensorflow_probability.python.math import scan_associative
@@ -11,7 +11,7 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     def _res_nan():
         A = tf.zeros_like(F)
@@ -44,7 +44,7 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
     return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def generic_filtering_element(F, Q, H, R, y):
     def _res_nan():
         A = F
@@ -76,7 +76,7 @@ def generic_filtering_element(F, Q, H, R, y):
     return tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
     first_elems = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
     generic_elems = tf.vectorized_map(lambda z: generic_filtering_element(z[0], z[1], H, R, z[2]),
@@ -85,7 +85,7 @@ def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
                  for first_e, gen_es in zip(first_elems, generic_elems))
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def filtering_operator(elems):
     elem1, elem2 = elems
 
@@ -106,12 +106,14 @@ def filtering_operator(elems):
     return A, b, C, J, eta
 
 
-@partial(tf.function, experimental_relax_shapes=True)
-def pkf(lgssm, observations, return_loglikelihood=False,
-        max_parallel: int = 3000):
+@tf.function
+def pkf(lgssm, observations, return_loglikelihood=False):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
     m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
+
+    n_elements = Fs.shape[0]
+    max_num_levels = math.ceil(math.log2(n_elements)) - 1
 
     initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
@@ -120,7 +122,7 @@ def pkf(lgssm, observations, return_loglikelihood=False,
 
     final_elements = scan_associative(vectorized_operator,
                                       initial_elements,
-                                      max_num_levels=math.ceil(math.log2(max_parallel)))
+                                      max_num_levels=max_num_levels)
     if return_loglikelihood:
         filtered_means = tf.concat([tf.expand_dims(m0, 0), final_elements[1][:-1]], axis=0)
         filtered_cov = tf.concat([tf.expand_dims(P0, 0), final_elements[2][:-1]], axis=0)
@@ -138,12 +140,12 @@ def pkf(lgssm, observations, return_loglikelihood=False,
     return final_elements[1], final_elements[2]
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def last_smoothing_element(m, P):
     return tf.zeros_like(P), m, P
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def generic_smoothing_element(F, Q, m, P):
     Pp = F @ mm(P, F, transpose_b=True) + Q
     chol = tf.linalg.cholesky(Pp)
@@ -153,7 +155,7 @@ def generic_smoothing_element(F, Q, m, P):
     return E, g, L
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covariances):
     last_elems = last_smoothing_element(filtering_means[-1], filtering_covariances[-1])
     generic_elems = tf.vectorized_map(lambda z: generic_smoothing_element(*z),
@@ -163,7 +165,7 @@ def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covar
                  for gen_es, last_e in zip(generic_elems, last_elems))
 
 
-@partial(tf.function, experimental_relax_shapes=True)
+@tf.function
 def smoothing_operator(elems):
     elem1, elem2 = elems
     E1, g1, L1 = elem1
@@ -176,8 +178,10 @@ def smoothing_operator(elems):
     return E, g, L
 
 
-@partial(tf.function, experimental_relax_shapes=True)
-def pks(lgssm, ms, Ps, max_parallel=3000):
+@tf.function
+def pks(lgssm, ms, Ps):
+    n_elements = ms.shape[0]
+    max_num_levels = math.ceil(math.log2(n_elements)) - 1
     _, Fs, Qs, *_ = lgssm
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)
@@ -185,13 +189,14 @@ def pks(lgssm, ms, Ps, max_parallel=3000):
     def vectorized_operator(a, b):
         return tf.vectorized_map(smoothing_operator, (a, b), fallback_to_while_loop=False)
 
+
     final_elements = scan_associative(vectorized_operator,
                                       reversed_elements,
-                                      max_num_levels=math.ceil(math.log2(max_parallel)))
+                                      max_num_levels=max_num_levels)
     return tf.reverse(final_elements[1], axis=[0]), tf.reverse(final_elements[2], axis=[0])
 
 
-@partial(tf.function, experimental_relax_shapes=True)
-def pkfs(model, observations, max_parallel=3000):
-    fms, fPs = pkf(model, observations, False, max_parallel)
-    return pks(model, fms, fPs, max_parallel)
+@tf.function
+def pkfs(model, observations):
+    fms, fPs = pkf(model, observations, False)
+    return pks(model, fms, fPs)

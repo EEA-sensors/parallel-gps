@@ -4,12 +4,12 @@ from collections import namedtuple
 import tensorflow as tf
 from gpflow import config
 
-from src.kalman.base import LGSSM
+from pssgp.kalman.base import LGSSM
 
 ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L", "H", "Q"])
 
 
-@tf.function(experimental_relax_shapes=True)
+@tf.function
 def _get_ssm(sde, ts, R, t0=0.):
     dtype = config.default_float()
     n = tf.shape(sde.F)[0]

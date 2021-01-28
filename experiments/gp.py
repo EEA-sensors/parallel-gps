@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from src.toymodels import sinu, obs_noise
+from pssgp.toymodels import sinu, obs_noise
 
 # Generate data
 tf.random.set_seed(666)

@@ -9,13 +9,14 @@ from scipy.special import binom
 
 @tf.function
 def _get_transition_matrix(lamda: tf.Tensor, d: int, dtype: tf.DType) -> tf.Tensor:
-    F = tf.linalg.diag(tf.ones((d - 1,), dtype=dtype), k=1, num_cols=d, num_rows=d)
-    binomial_coeffs = binom(d, np.arange(0, d, dtype=int)).astype(dtype)
-    binomial_coeffs = tf.convert_to_tensor(binomial_coeffs, dtype=dtype)
-    lambda_powers = lamda ** np.arange(d, 0, -1, dtype=dtype)
-    update_indices = [[d - 1, k] for k in range(d)]
-    F = tf.tensor_scatter_nd_sub(F, update_indices, lambda_powers * binomial_coeffs)
-    return F
+    with tf.name_scope("get_transition_matrix"):
+        F = tf.linalg.diag(tf.ones((d - 1,), dtype=dtype), k=1, num_cols=d, num_rows=d)
+        binomial_coeffs = binom(d, np.arange(0, d, dtype=int)).astype(dtype)
+        binomial_coeffs = tf.convert_to_tensor(binomial_coeffs, dtype=dtype)
+        lambda_powers = lamda ** np.arange(d, 0, -1, dtype=dtype)
+        update_indices = [[d - 1, k] for k in range(d)]
+        F = tf.tensor_scatter_nd_sub(F, update_indices, lambda_powers * binomial_coeffs)
+        return F
 
 
 def _get_brownian_cov(variance, lamda, d, dtype) -> tf.Tensor:

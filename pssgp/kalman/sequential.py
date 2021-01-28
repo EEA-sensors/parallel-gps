@@ -40,7 +40,6 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
         nan_y = ~tf.math.is_nan(y)
         nan_res = (ell, mp, Pp)
         ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: nan_res)
-
         return ell, m, P, mp, Pp
 
     ells, fms, fPs, mps, Pps = tf.scan(body,

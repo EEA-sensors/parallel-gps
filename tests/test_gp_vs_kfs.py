@@ -9,9 +9,9 @@ import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
 
-from src.kernels.matern import Matern12, Matern32, Matern52
-from src.model import StateSpaceGP
-from src.toymodels import sinu, obs_noise
+from pssgp.kernels.matern import Matern12, Matern32, Matern52
+from pssgp.model import StateSpaceGP
+from pssgp.toymodels import sinu, obs_noise
 
 
 class GPEquivalenceTest(unittest.TestCase):

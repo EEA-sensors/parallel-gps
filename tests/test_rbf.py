@@ -1,19 +1,20 @@
 import unittest
-import numpy.testing as npt
+import warnings
 
 import gpflow as gpf
 import numpy as np
+import numpy.testing as npt
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
-from src.kernels import RBF
-from src.model import StateSpaceGP
-from src.toymodels import sinu, obs_noise
+from pssgp.kernels import RBF
+from pssgp.model import StateSpaceGP
+from pssgp.toymodels import sinu, obs_noise
 
 
 class RBFTest(unittest.TestCase):
 
     def setUp(self):
+        np.random.seed(31415926)
         self.T = 2000
         self.K = 800
         self.t = np.sort(np.random.rand(self.T))
@@ -51,22 +52,37 @@ class RBFTest(unittest.TestCase):
     def test_loglikelihood(self):
         rbf_order = 12
         cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
-
+        check_grad_vars = cov.trainable_variables
         gp_model = gpf.models.GPR(data=self.data,
                                   kernel=cov,
                                   noise_variance=0.1,
                                   mean_function=None)
-        gp_model_ll = gp_model.log_marginal_likelihood()
+        with tf.GradientTape() as tape:
+            tape.watch(check_grad_vars)
+            gp_model_ll = gp_model.maximum_log_likelihood_objective()
+        gp_model_grad = tape.gradient(gp_model_ll, check_grad_vars)
         for parallel in [False, True]:
             ss_model = StateSpaceGP(data=self.data,
                                     kernel=cov,
                                     noise_variance=0.1,
                                     parallel=parallel)
-            ss_model_ll = ss_model.maximum_log_likelihood_objective()
+            with tf.GradientTape() as tape:
+                tape.watch(check_grad_vars)
+                ss_model_ll = ss_model.maximum_log_likelihood_objective()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # this is due to a slight theoretical incompatibility between scan_associative
+                # and experimental_relax_shapes compilation option, but this  no biggie.
+                ss_model_grad = tape.gradient(ss_model_ll, check_grad_vars)
             npt.assert_allclose(gp_model_ll,
                                 ss_model_ll,
                                 atol=1e-3,
                                 rtol=1e-3)
+            for gp_grad, ss_grad in zip(gp_model_grad, ss_model_grad):
+                npt.assert_allclose(gp_grad,
+                                    ss_grad,
+                                    atol=1e-2,
+                                    rtol=1e-2)
 
     def test_posterior(self):
         rbf_order = 12

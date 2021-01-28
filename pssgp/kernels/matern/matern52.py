@@ -3,8 +3,8 @@ import math
 import gpflow
 import tensorflow as tf
 
-from src.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
-from src.kernels.matern.common import get_matern_sde
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.kernels.matern.common import get_matern_sde
 
 
 class Matern52(gpflow.kernels.Matern52, SDEKernelMixin):

@@ -8,11 +8,11 @@ from gpflow.models.training_mixins import InputData, RegressionData
 from gpflow.models.util import data_input_to_tensor
 from gpflow.utilities import positive
 
-from src.kalman.parallel import pkf, pkfs
-from src.kalman.sequential import kf, kfs
+from pssgp.kalman.parallel import pkf, pkfs
+from pssgp.kalman.sequential import kf, kfs
 
 
-@tf.function(experimental_relax_shapes=True)
+@tf.function
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -33,27 +33,27 @@ def _merge_sorted(a, b, *args):
         Merging of a_x and b_x in the right order.
 
     """
-
-    assert len(a.shape) == len(b.shape) == 1
-    a_shape, b_shape = tf.shape(a)[0], tf.shape(b)[0]
-    c_len = tf.shape(a)[0] + tf.shape(b)[0]
-    if a_shape < b_shape:
-        a, b = b, a
+    with tf.name_scope("merge_sorted"):
+        assert len(a.shape) == len(b.shape) == 1
         a_shape, b_shape = tf.shape(a)[0], tf.shape(b)[0]
-        args = tuple((j, i) for i, j in args)
-    b_indices = tf.range(b_shape, dtype=tf.int32) + tf.searchsorted(a, b)
-    a_indices = tf.ones((c_len,), dtype=tf.bool)
-    a_indices = tf.tensor_scatter_nd_update(a_indices, b_indices[:, None], tf.zeros_like(b_indices, tf.bool))
-    c_range = tf.range(c_len, dtype=tf.int32)
-    a_mask = tf.boolean_mask(c_range, a_indices)[:, None]
+        c_len = tf.shape(a)[0] + tf.shape(b)[0]
+        if a_shape < b_shape:
+            a, b = b, a
+            a_shape, b_shape = tf.shape(a)[0], tf.shape(b)[0]
+            args = tuple((j, i) for i, j in args)
+        b_indices = tf.range(b_shape, dtype=tf.int32) + tf.searchsorted(a, b)
+        a_indices = tf.ones((c_len,), dtype=tf.bool)
+        a_indices = tf.tensor_scatter_nd_update(a_indices, b_indices[:, None], tf.zeros_like(b_indices, tf.bool))
+        c_range = tf.range(c_len, dtype=tf.int32)
+        a_mask = tf.boolean_mask(c_range, a_indices)[:, None]
 
-    def _inner_merge(u, v):
-        c = tf.concat([u, v], 0)
-        c = tf.tensor_scatter_nd_update(c, b_indices[:, None], v)
-        c = tf.tensor_scatter_nd_update(c, a_mask, u)
-        return c
+        def _inner_merge(u, v):
+            c = tf.concat([u, v], 0)
+            c = tf.tensor_scatter_nd_update(c, b_indices[:, None], v)
+            c = tf.tensor_scatter_nd_update(c, a_mask, u)
+            return c
 
-    return (_inner_merge(a, b),) + tuple(_inner_merge(i, j) for i, j in args)
+        return (_inner_merge(a, b),) + tuple(_inner_merge(i, j) for i, j in args)
 
 
 class StateSpaceGP(GPModel):
@@ -62,7 +62,6 @@ class StateSpaceGP(GPModel):
                  kernel,
                  noise_variance: float = 1.0,
                  parallel=False,
-                 max_parallel=5000
                  ):
         self._noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
@@ -72,8 +71,8 @@ class StateSpaceGP(GPModel):
             self._kf = kf
             self._kfs = kfs
         else:
-            self._kf = partial(pkf, max_parallel=max_parallel)
-            self._kfs = partial(pkfs, max_parallel=max_parallel)
+            self._kf = pkf
+            self._kfs = pkfs
 
     def _make_model(self, ts):
         R = tf.reshape(self._noise_variance, (1, 1))
