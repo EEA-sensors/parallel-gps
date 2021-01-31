@@ -42,71 +42,71 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
         return A, b, C, J, eta
 
     res = tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
-    for elem in res:
-        print(elem.shape)
     return res
+
 
 @tf.function
-def generic_filtering_element(F, Q, H, R, y):
-    def _res_nan():
-        A = F
-        b = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
-        C = Q
-        eta = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
-        J = tf.zeros_like(F)
+def _generic_filtering_element_nan(F, Q):
+    A = F
+    b = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
+    C = Q
+    eta = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
+    J = tf.zeros_like(F)
 
-        return A, b, C, J, eta
+    return A, b, C, J, eta
 
-    def _res_not_nan():
-        S = H @ mm(Q, H, transpose_b=True) + R
-        chol = tf.linalg.cholesky(S)
 
-        Kt = tf.linalg.cholesky_solve(chol, H @ Q)
-        A = F - mm(Kt, H, transpose_a=True) @ F
-        b = mv(Kt, y, transpose_a=True)
-        C = Q - mm(Kt, H, transpose_a=True) @ Q
+@tf.function
+def _generic_filtering_element(F, Q, H, R, y):
+    S = H @ mm(Q, H, transpose_b=True) + R
+    chol = tf.linalg.cholesky(S)
 
-        HF = H @ F
-        eta = mv(HF,
-                 tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
-                 transpose_a=True)
+    Kt = tf.linalg.cholesky_solve(chol, H @ Q)
+    A = F - mm(Kt, H, transpose_a=True) @ F
+    b = mv(Kt, y, transpose_a=True)
+    C = Q - mm(Kt, H, transpose_a=True) @ Q
 
-        J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
+    HF = H @ F
+    eta = mv(HF,
+             tf.squeeze(tf.linalg.cholesky_solve(chol, tf.expand_dims(y, 1)), 1),
+             transpose_a=True)
 
-        return A, b, C, J, eta
+    J = mm(HF, tf.linalg.cholesky_solve(chol, HF), transpose_a=True)
 
-    res = tf.cond(tf.math.is_nan(y), _res_nan, _res_not_nan)
-    for elem in res:
-        print(elem.shape)
-    return res
+    return A, b, C, J, eta
+
+
+@tf.function
+def _combine_nan_and_ok(ok_elem, nan_elem, ok_indices, nan_indices, n):
+    elem_shape = (n,) + tuple(s for s in nan_elem.shape[1:])
+    elem = tf.zeros(elem_shape, dtype=ok_elem.dtype)
+    elem = tf.tensor_scatter_nd_update(elem, nan_indices, nan_elem)
+    elem = tf.tensor_scatter_nd_update(elem, ok_indices, ok_elem)
+    return elem
 
 
 @tf.function
 def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
-    shape = tf.shape(Fs)
-    A0, b0, C0, J0, eta0 = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
+    n = tf.shape(observations)[0]
+    init_res = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
 
-    specialized_fun = lambda z: generic_filtering_element(z[0], z[1], H, R, z[2])
-    with tf.name_scope("generic_filtering_element"):
-        As, bs, Cs, Js, etas = tf.vectorized_map(specialized_fun,
-                                                 (Fs, Qs, observations),
-                                                 fallback_to_while_loop=False)
+    nan_ys = tf.squeeze(tf.math.is_nan(observations))
+    ok_ys = ~nan_ys
+    nan_res = tf.vectorized_map(lambda z: _generic_filtering_element_nan(*z),
+                                (tf.boolean_mask(Fs, nan_ys), tf.boolean_mask(Qs, nan_ys)))
+    ok_res = tf.vectorized_map(lambda z: _generic_filtering_element(z[0], z[1], H, R, z[2]),
+                               (tf.boolean_mask(Fs, ok_ys), tf.boolean_mask(Qs, ok_ys),
+                                tf.boolean_mask(observations, ok_ys)))
 
-    As = tf.reshape(As, shape)
-    bs = tf.reshape(bs, shape[:-1])
-    Cs = tf.reshape(Cs, shape)
-    Js = tf.reshape(Js, shape)
-    etas = tf.reshape(etas, shape[:-1])
+    indices = tf.reshape(tf.range(n, dtype=tf.int32), (-1, 1))
+    nan_ys_indices = tf.boolean_mask(indices, nan_ys)
+    ok_ys_indices = tf.boolean_mask(indices, ok_ys)
 
-    # These reshapes are only a matter of making sure that the shape of the tensors is known at compilation time.
-    # There could be a better way but I am not aware of it, and the operations above are virtually free.
-    # It is not clear why exactly we are losing the shape...
+    gen_res = []
+    for nan_elem, ok_elem in zip(nan_res, ok_res):
+        gen_res.append(_combine_nan_and_ok(ok_elem, nan_elem, ok_ys_indices, nan_ys_indices, n))
     return tuple(tf.tensor_scatter_nd_update(gen_es, [[0]], tf.expand_dims(first_e, 0))
-                 for first_e, gen_es in zip((A0, b0, C0, J0, eta0),
-                                            (As, bs, Cs, Js, etas)))
-    # return tuple(tf.concat([tf.expand_dims(first_e, 0), gen_es[1:]], 0)
-    #              for first_e, gen_es in zip((A0, b0, C0, J0, eta0),
-    #                                         (As, bs, Cs, Js, etas)))
+                 for first_e, gen_es in zip(init_res, gen_res))
 
 
 @tf.function
