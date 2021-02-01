@@ -1,8 +1,11 @@
 import abc
 from collections import namedtuple
+from typing import List, Optional
 
+import gpflow
 import tensorflow as tf
 from gpflow import config
+from gpflow.kernels import Kernel
 
 from pssgp.kalman.base import LGSSM
 
@@ -115,3 +118,68 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         """
         ssm = _get_ssm(self.get_sde(), ts, R, t0)
         return ssm
+
+    def __add__(self, other):
+        return SDESum([self, other])
+
+    def __mul(self, other):
+        return SDEProduct([self, other])
+
+
+def _sde_combination_init(self, kernels: List[Kernel], name: Optional[str] = None):
+    if not all(isinstance(k, SDEKernelMixin) for k in kernels):
+        raise TypeError("can only combine SDE Kernel instances")  # pragma: no cover
+    super().__init__(kernels, name)
+
+
+class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
+    __init__ = _sde_combination_init
+
+    @staticmethod
+    def _block_diagonal(matrices):
+        operators = [tf.linalg.LinearOperatorFullMatrix(matrix) for matrix in matrices]
+        block_op = tf.linalg.LinearOperatorBlockDiag(operators)
+        return block_op.to_dense()
+
+    def get_sde(self) -> ContinuousDiscreteModel:
+        """
+        Creates the linear time invariant continuous discrete system associated to the stationary kernel at hand
+
+        Returns
+        -------
+        sde: ContinuousDiscreteModel
+            The associated LTI model
+        """
+        kernels = self.kernels  # type: List[SDEKernelMixin]
+        P0s = []
+        Fs = []
+        Ls = []
+        Hs = []
+        Qs = []
+
+        for kernel in kernels:
+            P0, F, L, H, Q = kernel.get_sde()
+            P0s.append(P0)
+            Fs.append(F)
+            Ls.append(L)
+            Hs.append(H)
+            Qs.append(Q)
+        return ContinuousDiscreteModel(self._block_diagonal(P0s),
+                                       self._block_diagonal(Fs),
+                                       self._block_diagonal(Ls),
+                                       tf.concat(Hs, axis=1),
+                                       self._block_diagonal(Qs))
+
+
+class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
+    __init__ = _sde_combination_init
+
+    def get_sde(self) -> ContinuousDiscreteModel:
+        """
+        Creates the linear time invariant continuous discrete system associated to the stationary kernel at hand
+
+        Returns
+        -------
+        sde: ContinuousDiscreteModel
+            The associated LTI model
+        """
