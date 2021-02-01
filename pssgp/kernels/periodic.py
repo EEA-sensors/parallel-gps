@@ -62,7 +62,7 @@ class SDEPeriodic(gpflow.kernels.Periodic, SDEKernelMixin):
         dtype = config.default_float()
         N = self._order
         w0 = 2 * math.pi / self.period
-        lengthscales = self.lengthscales / tf.sqrt(2)
+        lengthscales = self.base_kernel.lengthscales / tf.cast(tf.sqrt(2.), dtype)
 
         # Prepare offline fixed coefficients
         b, K, div_facto_K = _get_offline_coeffs(N)
@@ -72,19 +72,19 @@ class SDEPeriodic(gpflow.kernels.Periodic, SDEKernelMixin):
 
         op_F = tf.linalg.LinearOperatorFullMatrix([[0, -w0], [w0, 0]])
         op_diag = tf.linalg.LinearOperatorDiag(tf.range(0, N + 1, dtype=dtype))
-        F = tf_kron(op_diag, op_F).to_dense()
+        F = tf_kron([op_diag, op_F]).to_dense()
 
         L = tf.eye(2 * (N + 1), dtype=dtype)
 
         Q = tf.zeros((2 * (N + 1), 2 * (N + 1)), dtype=dtype)
 
         q2 = b * lengthscales ** (-2 * K) * div_facto_K * tf.math.exp(lengthscales ** (-2)) * \
-             2 ** (-K) * self.variances
-        q2 = tf.reduce_sum(q2, axis=0)
+             2 ** (-K) * self.base_kernel.variance
+        q2 = tf.linalg.LinearOperatorFullMatrix(tf.reduce_sum(q2, axis=0, keepdims=True))
 
-        Pinf = tf_kron(q2, tf.linalg.LinearOperatorIdentity(2, dtype=dtype))
+        Pinf = tf_kron([q2, tf.linalg.LinearOperatorIdentity(2, dtype=dtype)])
 
-        H = tf_kron(tf.linalg.LinearOperatorFullMatrix(tf.ones((1, N + 1), dtype=dtype)),
-                    tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))).to_dense()
+        H = tf_kron([tf.linalg.LinearOperatorFullMatrix(tf.ones((1, N + 1), dtype=dtype)),
+                    tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))]).to_dense()
 
         return ContinuousDiscreteModel(Pinf, F, L, H, Q)
