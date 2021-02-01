@@ -7,7 +7,7 @@ import numba as nb
 import numpy as np
 import tensorflow as tf
 
-from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, solve_lyap_vec
 
 
 def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
@@ -61,47 +61,6 @@ def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
     H[0, 0] = GB
 
     return F, L, H, q
-
-
-def _solve_lyap_vec(F: tf.Tensor,
-                    L: tf.Tensor,
-                    q: tf.Tensor) -> tf.Tensor:
-    """Vectorized Lyapunov equation solver
-
-    F P + P F' + L q L' = 0
-
-    Parameters
-    ----------
-    F : tf.Tensor
-        ...
-    L : tf.Tensor
-        ...
-    q : tf.Tensor
-        ...
-
-    Returns
-    -------
-    Pinf : tf.Tensor
-        Steady state covariance
-
-    """
-    dtype = config.default_float()
-
-    dim = tf.shape(F)[0]
-
-    op1 = tf.linalg.LinearOperatorFullMatrix(F)
-    op2 = tf.linalg.LinearOperatorIdentity(dim, dtype=dtype)
-
-    F1 = tf.linalg.LinearOperatorKronecker([op2, op1]).to_dense()
-    F2 = tf.linalg.LinearOperatorKronecker([op1, op2]).to_dense()
-
-    F = F1 + F2
-
-    Q = L @ tf.transpose(L) * q
-
-    Pinf = tf.reshape(tf.linalg.solve(F, tf.reshape(Q, (-1, 1))), (dim, dim))
-    Pinf = -0.5 * (Pinf + tf.transpose(Pinf))
-    return Pinf
 
 
 @partial(nb.jit, nopython=True)
@@ -210,7 +169,7 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
 
         Fb, Lb, Hb, qb = _balance_ss(F, L, H, q, self._balancing_iter)
 
-        Pinf = _solve_lyap_vec(Fb, Lb, qb)
+        Pinf = solve_lyap_vec(Fb, Lb, qb)
 
         Q = tf.reshape(qb, (1, 1))
         return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Q)
