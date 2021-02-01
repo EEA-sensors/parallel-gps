@@ -1,4 +1,4 @@
-% cov_approx = ss_cov(tau,F,L,q,H)
+% cov_approx = ss_cov(tau,F,L,q,H,Pinf)
 %
 % Covariance function of state space model.
 
@@ -8,12 +8,12 @@
 
 % Copyright (C) 2014 Simo Sarkka
 
-function cov_approx = ss_cov(tau,F,L,q,H)
+function cov_approx = ss_cov(tau,F,L,q,H,Pinf)
 
-    %Pinf = are(F',zeros(size(F)),L*q*L');
-%    Pinf = lyap(F,F',L*q*L');
-    Pinf = lyapchol(F,L*sqrt(q));
-    Pinf = Pinf' * Pinf;
+    if nargin < 6
+        Pinf = lyapchol(F,L*sqrt(q));
+        Pinf = Pinf' * Pinf;
+    end
 
     % Initialize covariance
     cov_approx = zeros(size(tau));
