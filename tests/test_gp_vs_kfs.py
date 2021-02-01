@@ -10,7 +10,7 @@ import numpy.testing as npt
 import tensorflow as tf
 
 from pssgp.kernels import RBF
-from pssgp.kernels.base import SDESum
+from pssgp.kernels.base import SDESum, SDEProduct
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
@@ -43,8 +43,6 @@ class GPEquivalenceTest(unittest.TestCase):
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
-            if not isinstance(cov, SDESum):
-                continue
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,
