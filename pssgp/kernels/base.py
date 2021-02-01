@@ -1,5 +1,6 @@
 import abc
 from collections import namedtuple
+from functools import reduce
 from typing import List, Optional
 
 import gpflow
@@ -132,6 +133,25 @@ class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
 
 class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
     __init__ = _sde_combination_init
+    _LOW_LIM = 1e-6
+
+    @staticmethod
+    def _combine_F(F1, F2):
+        I1 = tf.eye(tf.shape(F1)[0], dtype=F1.dtype)
+        I2 = tf.eye(tf.shape(F2)[0], dtype=F2.dtype)
+        return kronecker(F1, I2) + kronecker(I1, F2)
+
+    @classmethod
+    def _combine_Q(cls, e1, e2):
+        Q1, P01 = e1
+        Q2, P02 = e2
+        Q1_zero = tf.reduce_all(tf.abs(Q1) < cls._LOW_LIM)
+        Q2_zero = tf.reduce_all(tf.abs(Q2) < cls._LOW_LIM)
+
+        Q1 = tf.cond(Q1_zero, P01, Q1)
+        Q2 = tf.cond(Q2_zero, P02, Q2)
+
+        return kronecker(Q1, Q2)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -142,3 +162,14 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
         sde: ContinuousDiscreteModel
             The associated LTI model
         """
+        kernels = self.kernels  # type: List[SDEKernelMixin]
+
+        sdes = [kernel.get_sde() for kernel in kernels]
+
+        F = reduce(self._combine_F, [sde.F for sde in sdes])
+        Q = reduce(self._combine_Q, [(sde.Q, sde.P0) for sde in sdes])
+        P0 = reduce(kronecker, [sde.P0 for sde in sdes])
+        H = reduce(kronecker, [sde.H for sde in sdes])
+        L = reduce(kronecker, [sde.L for sde in sdes])
+
+        return ContinuousDiscreteModel(P0, F, L, H, Q)
