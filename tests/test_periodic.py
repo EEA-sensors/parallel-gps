@@ -40,6 +40,7 @@ class PeriodicTest(unittest.TestCase):
                                                        [0.5, 0.5, 0.5]]), decimal=8)
 
     def test_sde_coeff(self):
+        sdes = self.cov.get_sde()
         pass
 
 
