@@ -96,8 +96,8 @@ class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
     __init__ = _sde_combination_init
 
     @staticmethod
-    def _block_diagonal(matrices):
-        operators = [tf.linalg.LinearOperatorFullMatrix(matrix) for matrix in matrices]
+    def _block_diagonal(matrices, is_positive_definite=False):
+        operators = [tf.linalg.LinearOperatorFullMatrix(matrix, is_positive_definite) for matrix in matrices]
         block_op = tf.linalg.LinearOperatorBlockDiag(operators)
         return block_op.to_dense()
 
@@ -124,11 +124,11 @@ class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
             Ls.append(L)
             Hs.append(H)
             Qs.append(Q)
-        return ContinuousDiscreteModel(self._block_diagonal(P0s),
+        return ContinuousDiscreteModel(self._block_diagonal(P0s, is_positive_definite=True),
                                        self._block_diagonal(Fs),
                                        self._block_diagonal(Ls),
                                        tf.concat(Hs, axis=1),
-                                       self._block_diagonal(Qs))
+                                       self._block_diagonal(Qs, is_positive_definite=True))
 
 
 class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
@@ -137,9 +137,11 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
 
     @staticmethod
     def _combine_F(F1, F2):
-        I1 = tf.eye(tf.shape(F1)[0], dtype=F1.dtype)
-        I2 = tf.eye(tf.shape(F2)[0], dtype=F2.dtype)
-        return kronecker(F1, I2) + kronecker(I1, F2)
+        I1 = tf.linalg.LinearOperatorIdentity(tf.shape(F1)[0], dtype=F1.dtype)
+        I2 = tf.linalg.LinearOperatorIdentity(tf.shape(F2)[0], dtype=F2.dtype)
+        kron_1 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(F1), I2])
+        kron_2 = tf.linalg.LinearOperatorKronecker([I1, tf.linalg.LinearOperatorFullMatrix(F2)])
+        return kron_1 + kron_2
 
     @classmethod
     def _combine_Q(cls, e1, e2):
@@ -150,8 +152,8 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
 
         Q1 = tf.cond(Q1_zero, P01, Q1)
         Q2 = tf.cond(Q2_zero, P02, Q2)
-
-        return kronecker(Q1, Q2)
+        return tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(Q1, is_positive_definite=True),
+                                                  tf.linalg.LinearOperatorFullMatrix(Q2, is_positive_definite=True)])
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -166,10 +168,13 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
 
         sdes = [kernel.get_sde() for kernel in kernels]
 
-        F = reduce(self._combine_F, [sde.F for sde in sdes])
-        Q = reduce(self._combine_Q, [(sde.Q, sde.P0) for sde in sdes])
-        P0 = reduce(kronecker, [sde.P0 for sde in sdes])
-        H = reduce(kronecker, [sde.H for sde in sdes])
-        L = reduce(kronecker, [sde.L for sde in sdes])
+        F = reduce(self._combine_F, [sde.F for sde in sdes]).to_dense()
+        Q = reduce(self._combine_Q, [(sde.Q, sde.P0) for sde in sdes]).to_dense()
+        P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True)
+                                                for sde in sdes]).to_dense()
+        H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H, is_positive_definite=True)
+                                               for sde in sdes]).to_dense()
+        L = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.L, is_positive_definite=True)
+                                               for sde in sdes]).to_dense()
 
         return ContinuousDiscreteModel(P0, F, L, H, Q)
