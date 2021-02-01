@@ -7,7 +7,8 @@ import numba as nb
 import numpy as np
 import tensorflow as tf
 
-from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, solve_lyap_vec
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.math_utils import solve_lyap_vec
 
 
 def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
@@ -145,7 +146,8 @@ class RBF(gpflow.kernels.RBF, SDEKernelMixin):
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
         self._order = kwargs.pop('order', 3)
         self._balancing_iter = kwargs.pop('balancing_iter', 5)
-        super().__init__(variance, lengthscales, **kwargs)
+        gpflow.kernels.RBF.__init__(self, variance, lengthscales)
+        SDEKernelMixin.__init__(self, **kwargs)
 
     __init__.__doc__ = r"""TODO: talk about order params \n\n""" + gpflow.kernels.RBF.__init__.__doc__
 
