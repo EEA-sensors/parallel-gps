@@ -136,24 +136,21 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
     _LOW_LIM = 1e-6
 
     @staticmethod
-    def _combine_F(F1, F2):
-        I1 = tf.linalg.LinearOperatorIdentity(tf.shape(F1)[0], dtype=F1.dtype)
-        I2 = tf.linalg.LinearOperatorIdentity(tf.shape(F2)[0], dtype=F2.dtype)
-        kron_1 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(F1), I2])
-        kron_2 = tf.linalg.LinearOperatorKronecker([I1, tf.linalg.LinearOperatorFullMatrix(F2)])
+    def _combine(op1, op2):
+        I1 = tf.linalg.LinearOperatorIdentity(tf.shape(op1)[0], dtype=op1.dtype)
+        I2 = tf.linalg.LinearOperatorIdentity(tf.shape(op2)[0], dtype=op2.dtype)
+        if not isinstance(op1, tf.linalg.LinearOperator):
+            op1 = tf.linalg.LinearOperatorFullMatrix(op1)
+        if not isinstance(op2, tf.linalg.LinearOperator):
+            op2 = tf.linalg.LinearOperatorFullMatrix(op2)
+        kron_1 = tf.linalg.LinearOperatorKronecker([op1, I2])
+        kron_2 = tf.linalg.LinearOperatorKronecker([I1, op2])
         return kron_1 + kron_2
 
     @classmethod
-    def _combine_Q(cls, e1, e2):
-        Q1, P01 = e1
-        Q2, P02 = e2
-        Q1_zero = tf.reduce_all(tf.abs(Q1) < cls._LOW_LIM)
-        Q2_zero = tf.reduce_all(tf.abs(Q2) < cls._LOW_LIM)
-
-        Q1 = tf.cond(Q1_zero, P01, Q1)
-        Q2 = tf.cond(Q2_zero, P02, Q2)
-        return tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(Q1, is_positive_definite=True),
-                                                  tf.linalg.LinearOperatorFullMatrix(Q2, is_positive_definite=True)])
+    def _filter_Q(cls, Q, P0):
+        Q_zero = tf.reduce_all(tf.abs(Q) < cls._LOW_LIM)
+        return tf.cond(Q_zero, P0, Q)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -167,9 +164,10 @@ class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
         kernels = self.kernels  # type: List[SDEKernelMixin]
 
         sdes = [kernel.get_sde() for kernel in kernels]
+        Qs = [self._filter_Q(sde.Q, sde.P0) for sde in sdes]
 
-        F = reduce(self._combine_F, [sde.F for sde in sdes]).to_dense()
-        Q = reduce(self._combine_Q, [(sde.Q, sde.P0) for sde in sdes]).to_dense()
+        F = reduce(self._combine, [sde.F for sde in sdes]).to_dense()
+        Q = reduce(self._combine, Qs).to_dense()
         P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True)
                                                 for sde in sdes]).to_dense()
         H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H, is_positive_definite=True)
