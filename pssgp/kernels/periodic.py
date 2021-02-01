@@ -42,7 +42,7 @@ def _get_offline_coeffs(N) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return b, K, div_facto_K
 
 
-class SDEPeriodic(gpflow.kernels.Periodic, SDEKernelMixin):
+class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
     __doc__ = gpflow.kernels.Periodic.__doc__
 
     def __init__(self, base_kernel: SquaredExponential, period: Union[float, List[float]] = 1.0, **kwargs):

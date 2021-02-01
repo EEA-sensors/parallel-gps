@@ -80,26 +80,46 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         return ssm
 
     def __add__(self, other):
-        return SDESum([self, other])
+        return SDESum([self, other])  # noqa: don't complain Pycharm, I know what's good for you.
 
     def __mul(self, other):
-        return SDEProduct([self, other])
+        return SDEProduct([self, other])  # noqa: don't complain Pycharm, I know what's good for you.
 
 
-def _sde_combination_init(self, kernels: List[Kernel], name: Optional[str] = None):
+def _sde_combination_init(self, kernels: List[Kernel], name: Optional[str] = None, **kargs):
     if not all(isinstance(k, SDEKernelMixin) for k in kernels):
         raise TypeError("can only combine SDE Kernel instances")  # pragma: no cover
-    super().__init__(kernels, name)
+    gpflow.kernels.Sum.__init__(self, kernels, name)
+    SDEKernelMixin.__init__(self, **kargs)
 
 
-class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
+def block_diag(arrs):
+    xdims = [tf.shape(a)[0] for a in arrs]
+    ydims = [tf.shape(a)[1] for a in arrs]
+    out_dtype = arrs[0].dtype
+    out = tf.zeros((0, sum(ydims)), dtype=out_dtype)
+    ydim = sum(ydims)
+    r, c = 0, 0
+    for i, (rr, cc) in enumerate(zip(xdims, ydims)):
+        paddings = [[0, 0],
+                    [c, ydim - c - cc]]
+
+        out = tf.concat([out, tf.pad(arrs[i], paddings)], 0)
+        r = r + rr
+        c = c + cc
+    return out
+
+
+class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
     __init__ = _sde_combination_init
 
     @staticmethod
-    def _block_diagonal(matrices, is_positive_definite=False):
-        operators = [tf.linalg.LinearOperatorFullMatrix(matrix, is_positive_definite) for matrix in matrices]
-        block_op = tf.linalg.LinearOperatorBlockDiag(operators)
-        return block_op.to_dense()
+    def _block_diagonal(matrices, is_positive_definite=False, square=True):
+        if square:
+            operators = [tf.linalg.LinearOperatorFullMatrix(matrix, is_positive_definite) for matrix in matrices]
+            block_op = tf.linalg.LinearOperatorBlockDiag(operators)
+            return block_op.to_dense()
+        return block_diag(matrices)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -126,12 +146,12 @@ class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
             Qs.append(Q)
         return ContinuousDiscreteModel(self._block_diagonal(P0s, is_positive_definite=True),
                                        self._block_diagonal(Fs),
-                                       self._block_diagonal(Ls),
+                                       self._block_diagonal(Ls, square=False),
                                        tf.concat(Hs, axis=1),
                                        self._block_diagonal(Qs, is_positive_definite=True))
 
 
-class SDEProduct(gpflow.kernels.Product, SDEKernelMixin):
+class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
     __init__ = _sde_combination_init
     _LOW_LIM = 1e-6
 

@@ -140,7 +140,7 @@ def _balance_ss(F: tf.Tensor,
     return F, L, H, q
 
 
-class RBF(gpflow.kernels.RBF, SDEKernelMixin):
+class RBF(SDEKernelMixin, gpflow.kernels.RBF):
     __doc__ = gpflow.kernels.RBF.__doc__
 
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):

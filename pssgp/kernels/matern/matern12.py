@@ -5,7 +5,7 @@ from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
 from pssgp.kernels.matern.common import get_matern_sde
 
 
-class Matern12(gpflow.kernels.Matern12, SDEKernelMixin):
+class Matern12(SDEKernelMixin, gpflow.kernels.Matern12):
     __doc__ = gpflow.kernels.Matern12.__doc__
 
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
