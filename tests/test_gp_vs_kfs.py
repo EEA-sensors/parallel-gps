@@ -43,6 +43,8 @@ class GPEquivalenceTest(unittest.TestCase):
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
+            if not isinstance(cov, SDEProduct):
+                continue
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,

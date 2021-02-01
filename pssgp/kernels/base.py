@@ -156,21 +156,25 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
     _LOW_LIM = 1e-6
 
     @staticmethod
-    def _combine(op1, op2):
+    def _combine_F(op1, op2):
         I1 = tf.linalg.LinearOperatorIdentity(tf.shape(op1)[0], dtype=op1.dtype)
         I2 = tf.linalg.LinearOperatorIdentity(tf.shape(op2)[0], dtype=op2.dtype)
-        if not isinstance(op1, tf.linalg.LinearOperator):
-            op1 = tf.linalg.LinearOperatorFullMatrix(op1)
-        if not isinstance(op2, tf.linalg.LinearOperator):
-            op2 = tf.linalg.LinearOperatorFullMatrix(op2)
+        op1 = tf.linalg.LinearOperatorFullMatrix(op1)
+        op2 = tf.linalg.LinearOperatorFullMatrix(op2)
         kron_1 = tf.linalg.LinearOperatorKronecker([op1, I2])
         kron_2 = tf.linalg.LinearOperatorKronecker([I1, op2])
         return kron_1.to_dense() + kron_2.to_dense()
 
+    @staticmethod
+    def _combine_Q(op1, op2):
+        kron = tf.linalg.LinearOperatorKronecker([op1, op2])
+        return kron.to_dense()
+
     @classmethod
     def _filter_Q(cls, Q, P0):
         Q_zero = tf.reduce_all(tf.abs(Q) < cls._LOW_LIM)
-        return tf.cond(Q_zero, lambda: P0, lambda: Q)
+        return tf.linalg.LinearOperatorFullMatrix(tf.cond(Q_zero, lambda: P0, lambda: Q),
+                                                  is_positive_definite=True)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -186,13 +190,13 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
         sdes = [kernel.get_sde() for kernel in kernels]
         Qs = [self._filter_Q(sde.Q, sde.P0) for sde in sdes]
 
-        F = reduce(self._combine, [sde.F for sde in sdes])
-        Q = reduce(self._combine, Qs)
+        F = reduce(self._combine_F, [sde.F for sde in sdes])
+        Q = reduce(self._combine_Q, Qs)
         P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True)
                                                 for sde in sdes]).to_dense()
-        H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H, is_positive_definite=True)
+        H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H)
                                                for sde in sdes]).to_dense()
-        L = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.L, is_positive_definite=True)
+        L = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.L)
                                                for sde in sdes]).to_dense()
 
         return ContinuousDiscreteModel(P0, F, L, H, Q)
