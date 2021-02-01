@@ -116,7 +116,7 @@ class SDESum(gpflow.kernels.Sum, SDEKernelMixin):
         Hs = []
         Qs = []
 
-        for kernel in self.kernels:
+        for kernel in kernels:
             P0, F, L, H, Q = kernel.get_sde()
             P0s.append(P0)
             Fs.append(F)
