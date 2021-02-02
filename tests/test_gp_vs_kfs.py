@@ -11,7 +11,6 @@ import tensorflow as tf
 
 from gpflow.kernels import SquaredExponential
 from pssgp.kernels import RBF, SDEPeriodic
-from pssgp.kernels.base import SDESum, SDEProduct
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
@@ -19,7 +18,7 @@ from pssgp.toymodels import sinu, obs_noise
 
 def setUpModule():  # noqa: unittest syntax.
     # goal is to test the logic, not the runtime.
-    np.random.seed(666)
+    np.random.seed(31415926)
     tf.config.set_visible_devices([], 'GPU')
 
 
@@ -37,7 +36,7 @@ class GPEquivalenceTest(unittest.TestCase):
             (Matern32(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern52(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (RBF(variance=1., lengthscales=0.5, order=15, balancing_iter=10), 1e-2, 1e-2),
-            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-1, 1e-1)
+            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-3, 1e-3)
         )
         self.covs += ((self.covs[0][0] + self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
         self.covs += ((self.covs[0][0] * self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
@@ -76,7 +75,6 @@ class GPEquivalenceTest(unittest.TestCase):
                                         atol=grad_tol,
                                         rtol=grad_tol)
 
-    @unittest.skip
     def test_posterior(self):
         query = tf.constant(np.sort(np.random.rand(self.K, 1), 0))
         for cov, val_tol, _ in self.covs:

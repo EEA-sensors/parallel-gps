@@ -62,7 +62,7 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
         dtype = config.default_float()
         N = self._order
         w0 = 2 * math.pi / self.period
-        lengthscales = self.base_kernel.lengthscales * tf.cast(tf.sqrt(2.), dtype)
+        lengthscales = self.base_kernel.lengthscales * 2.
 
         # Prepare offline fixed coefficients
         b, K, div_facto_K = _get_offline_coeffs(N)
