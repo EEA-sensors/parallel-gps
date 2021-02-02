@@ -14,6 +14,7 @@
 
     damping = 'se';
     [Pinf,F,L,H,q] = qper_to_ss(magnSigma2, lengthScale, period, mlengthScale, damping);
+    err1 = norm(Pinf-solve_lyap(F,L,q))
     
     clf;
     subplot(1,2,1);
@@ -33,4 +34,7 @@
     h = plot(t,ss_cov(t,F,L,q,H),t,qper_k(t,nu),'--');
     set(h,'LineWidth',2);
     title('C(\tau)');
+    
+    err2 = max(abs(ss_cov(t,F,L,q,H)-qper_k(t,nu)))
+    err3 = norm(Pinf-solve_lyap(F,L,q))
     

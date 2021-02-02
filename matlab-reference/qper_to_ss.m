@@ -8,10 +8,5 @@ function [Pinf,F,L,H,q] = qper_to_ss(magnSigma2, lengthScale, period, mlengthSca
     [Pinf1,F1,L1,H1,q1] = per_to_ss(magnSigma2,lengthScale,period,N);     
     [Pinf2,F2,L2,H2,q2] = feval(sprintf('%s_to_ss',damping),1,mlengthScale);
     
-    F    = kron(F1,eye(size(F2))) + kron(eye(size(F1)),F2);
-    L    = kron(L1,L2);
-    q    = kron(Pinf1,q2);
-    Pinf = kron(Pinf1,Pinf2);
-    H    = kron(H1,H2);
+    [Pinf,F,L,H,q] = prod_cov(Pinf1,F1,L1,H1,q1,Pinf2,F2,L2,H2,q2);
 end
-
