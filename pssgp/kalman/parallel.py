@@ -11,7 +11,7 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-@tf.function
+#@tf.function
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     def _res_nan():
         A = tf.zeros_like(F)
@@ -90,8 +90,9 @@ def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
     n = tf.shape(observations)[0]
     init_res = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
 
-    nan_ys = tf.squeeze(tf.math.is_nan(observations))
+    nan_ys = tf.reshape(tf.math.is_nan(observations), (-1,))
     ok_ys = ~nan_ys
+
     nan_res = tf.vectorized_map(lambda z: _generic_filtering_element_nan(*z),
                                 (tf.boolean_mask(Fs, nan_ys), tf.boolean_mask(Qs, nan_ys)))
     ok_res = tf.vectorized_map(lambda z: _generic_filtering_element(z[0], z[1], H, R, z[2]),
@@ -110,14 +111,15 @@ def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
 
 
 @tf.function
-def filtering_operator(elems):
-    elem1, elem2 = elems
+def filtering_operator(elem1, elem2):
+    # elem1, elem2 = elems
     A1, b1, C1, J1, eta1 = elem1
     A2, b2, C2, J2, eta2 = elem2
-    dim = tf.shape(A1)[0]
-    I = tf.eye(dim, dtype=A1.dtype)
 
-    temp = tf.linalg.solve(I + C1 @ J2, tf.transpose(A2), adjoint=True)
+    n, dim = tf.shape(A1)[0], A1.shape[1]
+    I = tf.eye(dim, dtype=A1.dtype, batch_shape=(n,))
+
+    temp = tf.linalg.solve(I + C1 @ J2, tf.transpose(A2, perm=[0, 2, 1]), adjoint=True)
     A = mm(temp, A1, transpose_a=True)
     b = mv(temp, b1 + mv(C1, eta2), transpose_a=True) + b2
     C = mm(temp, mm(C1, A2, transpose_b=True), transpose_a=True) + C2
@@ -129,20 +131,18 @@ def filtering_operator(elems):
 
 
 @tf.function
-def pkf(lgssm, observations, return_loglikelihood=False):
+def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
     with tf.name_scope("parallel_filter"):
         P0, Fs, Qs, H, R = lgssm
         dtype = P0.dtype
         m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
 
-        n_elements = observations.shape[0]
-        max_num_levels = math.ceil(math.log2(n_elements)) - 1
+        max_num_levels = math.ceil(math.log2(max_parallel)) - 1
         initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
-        def vectorized_operator(a, b):
-            return tf.vectorized_map(filtering_operator, (a, b), fallback_to_while_loop=False)
-
-        final_elements = scan_associative(vectorized_operator,
+        # def vectorized_operator(a, b):
+        #     return tf.vectorized_map(filtering_operator, (a, b), fallback_to_while_loop=False)
+        final_elements = scan_associative(filtering_operator,
                                           initial_elements,
                                           max_num_levels=max_num_levels)
 
@@ -203,9 +203,8 @@ def smoothing_operator(elems):
 
 
 @tf.function
-def pks(lgssm, ms, Ps):
-    n_elements = ms.shape[0]
-    max_num_levels = math.ceil(math.log2(n_elements)) - 1
+def pks(lgssm, ms, Ps, max_parallel=10000):
+    max_num_levels = math.ceil(math.log2(max_parallel)) - 1
     _, Fs, Qs, *_ = lgssm
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)
@@ -220,6 +219,6 @@ def pks(lgssm, ms, Ps):
 
 
 @tf.function
-def pkfs(model, observations):
-    fms, fPs = pkf(model, observations, False)
-    return pks(model, fms, fPs)
+def pkfs(model, observations, max_parallel=10000):
+    fms, fPs = pkf(model, observations, False, max_parallel)
+    return pks(model, fms, fPs, max_parallel)

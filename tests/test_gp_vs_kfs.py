@@ -1,7 +1,7 @@
 """
 Numerically test if GP reg has the same results with KFS
 """
-
+import time
 import unittest
 
 import gpflow as gpf
@@ -37,15 +37,16 @@ class GPEquivalenceTest(unittest.TestCase):
             (Matern32(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern52(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (RBF(variance=1., lengthscales=0.5, order=15, balancing_iter=10), 1e-2, 1e-2),
-            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-1, 1e-1)
+            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-2, 1e-2)
         )
-        self.covs += ((self.covs[0][0] + self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
-        self.covs += ((self.covs[0][0] * self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
+        self.covs += ((self.covs[1][0] + self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
+        self.covs += ((self.covs[1][0] * self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
+
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,
@@ -57,14 +58,20 @@ class GPEquivalenceTest(unittest.TestCase):
                 gp_model_ll = gp_model.maximum_log_likelihood_objective()
             gp_model_grad = tape.gradient(gp_model_ll, check_grad_vars)
 
-            for parallel in [False]:
+            for parallel in [True]:
+                tic = time.time()
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
-                                        parallel=parallel)
+                                        parallel=parallel,
+                                        max_parallel=self.T + self.K)
+                print(time.time() - tic)
                 with tf.GradientTape() as tape:
                     tape.watch(check_grad_vars)
+                    tic = time.time()
                     ss_model_ll = ss_model.maximum_log_likelihood_objective()
+                    print(time.time() - tic)
+                print(ss_model._kf.pretty_printed_concrete_signatures)
                 ss_model_grad = tape.gradient(ss_model_ll, check_grad_vars)
                 npt.assert_allclose(gp_model_ll,
                                     ss_model_ll,
@@ -76,7 +83,6 @@ class GPEquivalenceTest(unittest.TestCase):
                                         atol=grad_tol,
                                         rtol=grad_tol)
 
-    @unittest.skip
     def test_posterior(self):
         query = tf.constant(np.sort(np.random.rand(self.K, 1), 0))
         for cov, val_tol, _ in self.covs:
@@ -89,7 +95,8 @@ class GPEquivalenceTest(unittest.TestCase):
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
-                                        parallel=parallel)
+                                        parallel=parallel,
+                                        max_parallel=self.T + self.K)
                 mean_ss, var_ss = ss_model.predict_f(query)
                 npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0], atol=val_tol, rtol=val_tol)
 

@@ -7,7 +7,7 @@ import numba as nb
 import numpy as np
 import tensorflow as tf
 
-from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
 from pssgp.math_utils import solve_lyap_vec
 
 
@@ -150,6 +150,9 @@ class RBF(SDEKernelMixin, gpflow.kernels.RBF):
         SDEKernelMixin.__init__(self, **kwargs)
 
     __init__.__doc__ = r"""TODO: talk about order params \n\n""" + gpflow.kernels.RBF.__init__.__doc__
+
+    def get_spec(self, T):
+        return get_lssm_spec(self._order, T)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         F_, L_, H_, q_ = _get_unscaled_rbf_sde(self._order)

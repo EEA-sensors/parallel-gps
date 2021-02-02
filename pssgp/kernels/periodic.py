@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from scipy.special import factorial, comb
 from gpflow.kernels import SquaredExponential
-from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
 
 tf_kron = tf.linalg.LinearOperatorKronecker
 
@@ -46,23 +46,19 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
     __doc__ = gpflow.kernels.Periodic.__doc__
 
     def __init__(self, base_kernel: SquaredExponential, period: Union[float, List[float]] = 1.0, **kwargs):
-        """
-        Note: The gpflow has a different periodic covariance function.
-
-        Periodic in gpflow is: k(r) =  σ² exp{ -0.5 sin²(π r / γ) / ℓ²},
-        ours: k(r) =  σ² exp{ -2 sin²(w r / 2) / ℓ²},  where w = 2 π / γ
-        To keep consistence, we need to scale up the gpflow lengthscale. That is, ℓ_ss = sqrt(2) * ℓ_gpflow.
-        """
         assert isinstance(base_kernel, SquaredExponential), "Only SquaredExponential is supported at the moment"
         self._order = kwargs.pop('order', 6)
         gpflow.kernels.Periodic.__init__(self, base_kernel, period)
         SDEKernelMixin.__init__(self, **kwargs)
 
+    def get_spec(self, T):
+        return get_lssm_spec(2 * (self._order + 1), T)
+
     def get_sde(self) -> ContinuousDiscreteModel:
         dtype = config.default_float()
         N = self._order
         w0 = 2 * math.pi / self.period
-        lengthscales = self.base_kernel.lengthscales * tf.cast(tf.sqrt(2.), dtype)
+        lengthscales = self.base_kernel.lengthscales * 2.
 
         # Prepare offline fixed coefficients
         b, K, div_facto_K = _get_offline_coeffs(N)
@@ -86,5 +82,4 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
 
         H = tf_kron([tf.linalg.LinearOperatorFullMatrix(tf.ones((1, N + 1), dtype=dtype)),
                     tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))]).to_dense()
-
         return ContinuousDiscreteModel(Pinf, F, L, H, Q)

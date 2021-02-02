@@ -1,7 +1,7 @@
 import gpflow
 import tensorflow as tf
 
-from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin
+from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
 from pssgp.kernels.matern.common import get_matern_sde
 
 
@@ -12,6 +12,9 @@ class Matern12(SDEKernelMixin, gpflow.kernels.Matern12):
         self._order = kwargs.pop('order', 3)
         gpflow.kernels.Matern12.__init__(self, variance, lengthscales, **kwargs)
         SDEKernelMixin.__init__(self, **kwargs)
+
+    def get_spec(self, T):
+        return get_lssm_spec(1, T)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         F, L, H, Q = get_matern_sde(self.variance, self.lengthscales, 1)

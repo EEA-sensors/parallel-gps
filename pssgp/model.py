@@ -1,7 +1,7 @@
 from functools import partial
 
 import tensorflow as tf
-from gpflow import Parameter
+from gpflow import Parameter, config
 from gpflow.models import GPModel
 from gpflow.models.model import MeanAndVariance
 from gpflow.models.training_mixins import InputData, RegressionData
@@ -62,17 +62,22 @@ class StateSpaceGP(GPModel):
                  kernel,
                  noise_variance: float = 1.0,
                  parallel=False,
+                 max_parallel=10000,
                  ):
         self._noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
         super().__init__(kernel, None, None, num_latent_gps=ys.shape[-1])
         self.data = ts, ys
+        filter_spec = kernel.get_spec(ts.shape[0])
+        smoother_spec = kernel.get_spec(None)
+        ys_spec = tf.TensorSpec((None, 1), config.default_float())
+
         if not parallel:
-            self._kf = kf
-            self._kfs = kfs
+            self._kf = kf.get_concrete_function(filter_spec, ys_spec, True, False)
+            self._kfs = kfs.get_concrete_function(smoother_spec, ys_spec)
         else:
-            self._kf = pkf
-            self._kfs = pkfs
+            self._kf = pkf.get_concrete_function(filter_spec, ys_spec, True, max_parallel)
+            self._kfs = pkfs.get_concrete_function(smoother_spec, ys_spec, max_parallel)
 
     def _make_model(self, ts):
         with tf.name_scope("make_model"):
@@ -99,5 +104,5 @@ class StateSpaceGP(GPModel):
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
         ts, Y = self.data
         ssm = self._make_model(ts)
-        fms, fPs, ll = self._kf(ssm, Y, True)
+        fms, fPs, ll = self._kf(ssm, Y)
         return ll
