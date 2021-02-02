@@ -166,9 +166,15 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
         return kron_1.to_dense() + kron_2.to_dense()
 
     @staticmethod
-    def _combine_Q(op1, op2):
-        kron = tf.linalg.LinearOperatorKronecker([op1, op2])
-        return kron.to_dense()
+    def _combine_Q(sde1, sde2):
+        gamma1 = tf.linalg.LinearOperatorFullMatrix(sde1.L @ sde1.Q @ tf.transpose(sde1.L))
+        gamma2 = tf.linalg.LinearOperatorFullMatrix(sde2.L @ sde2.Q @ tf.transpose(sde2.L))
+        Pinf1 = tf.linalg.LinearOperatorFullMatrix(sde1.P0)
+        Pinf2 = tf.linalg.LinearOperatorFullMatrix(sde2.P0)
+
+        kron_1 = tf.linalg.LinearOperatorKronecker([gamma1, Pinf2])
+        kron_2 = tf.linalg.LinearOperatorKronecker([Pinf1, gamma2])
+        return kron_1.to_dense() + kron_2.to_dense()
 
     @classmethod
     def _filter_Q(cls, Q, P0):
@@ -185,18 +191,17 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
         sde: ContinuousDiscreteModel
             The associated LTI model
         """
+        dtype = gpflow.config.default_float()
         kernels = self.kernels  # type: List[SDEKernelMixin]
 
         sdes = [kernel.get_sde() for kernel in kernels]
-        Qs = [self._filter_Q(sde.Q, sde.P0) for sde in sdes]
 
         F = reduce(self._combine_F, [sde.F for sde in sdes])
-        Q = reduce(self._combine_Q, Qs)
+        Q = reduce(self._combine_Q, [sde for sde in sdes])
         P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True)
                                                 for sde in sdes]).to_dense()
         H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H)
                                                for sde in sdes]).to_dense()
-        L = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.L)
-                                               for sde in sdes]).to_dense()
+        L = tf.eye(tf.shape(Q)[0], dtype=dtype)
 
         return ContinuousDiscreteModel(P0, F, L, H, Q)
