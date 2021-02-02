@@ -55,7 +55,7 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
     _, Fs, Qs, *_ = lgssm
 
     def body(carry, inp):
-        F, Q, m, P, mp, Pp, y = inp
+        F, Q, m, P, mp, Pp = inp
         sm, sP = carry
 
         chol = tf.linalg.cholesky(Pp)
@@ -65,7 +65,7 @@ def ks(lgssm, ms, Ps, mps, Pps, ys):
         return sm, sP
 
     (sms, sPs) = tf.scan(body,
-                         (Fs[1:], Qs[1:], ms[:-1], Ps[:-1], mps[1:], Pps[1:], ys[1:]),
+                         (Fs[1:], Qs[1:], ms[:-1], Ps[:-1], mps[1:], Pps[1:]),
                          (ms[-1], Ps[-1]), reverse=True)
     sms = tf.concat([sms, tf.expand_dims(ms[-1], 0)], 0)
     sPs = tf.concat([sPs, tf.expand_dims(Ps[-1], 0)], 0)

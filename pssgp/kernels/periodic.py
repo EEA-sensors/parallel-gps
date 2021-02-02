@@ -51,7 +51,7 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
 
         Periodic in gpflow is: k(r) =  σ² exp{ -0.5 sin²(π r / γ) / ℓ²},
         ours: k(r) =  σ² exp{ -2 sin²(w r / 2) / ℓ²},  where w = 2 π / γ
-        To keep consistence, we need to scale down self.lengthscales by sqrt(2), i.e., self.lengthscales / sqrt(2)
+        To keep consistence, we need to scale up the gpflow lengthscale. That is, ℓ_ss = sqrt(2) * ℓ_gpflow.
         """
         assert isinstance(base_kernel, SquaredExponential), "Only SquaredExponential is supported at the moment"
         self._order = kwargs.pop('order', 6)
@@ -62,7 +62,7 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
         dtype = config.default_float()
         N = self._order
         w0 = 2 * math.pi / self.period
-        lengthscales = self.base_kernel.lengthscales / tf.cast(tf.sqrt(2.), dtype)
+        lengthscales = self.base_kernel.lengthscales * tf.cast(tf.sqrt(2.), dtype)
 
         # Prepare offline fixed coefficients
         b, K, div_facto_K = _get_offline_coeffs(N)
@@ -78,11 +78,11 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
 
         Q = tf.zeros((2 * (N + 1), 2 * (N + 1)), dtype=dtype)
 
-        q2 = b * lengthscales ** (-2 * K) * div_facto_K * tf.math.exp(lengthscales ** (-2)) * \
+        q2 = b * lengthscales ** (-2 * K) * div_facto_K * tf.math.exp(-lengthscales ** (-2)) * \
              2 ** (-K) * self.base_kernel.variance
-        q2 = tf.linalg.LinearOperatorFullMatrix(tf.reduce_sum(q2, axis=0, keepdims=True))
+        q2 = tf.linalg.LinearOperatorDiag(tf.reduce_sum(q2, axis=0))
 
-        Pinf = tf_kron([q2, tf.linalg.LinearOperatorIdentity(2, dtype=dtype)])
+        Pinf = tf_kron([q2, tf.linalg.LinearOperatorIdentity(2, dtype=dtype)]).to_dense()
 
         H = tf_kron([tf.linalg.LinearOperatorFullMatrix(tf.ones((1, N + 1), dtype=dtype)),
                     tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))]).to_dense()

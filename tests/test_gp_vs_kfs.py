@@ -9,7 +9,8 @@ import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
 
-from pssgp.kernels import RBF
+from gpflow.kernels import SquaredExponential
+from pssgp.kernels import RBF, SDEPeriodic
 from pssgp.kernels.base import SDESum, SDEProduct
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
@@ -30,11 +31,13 @@ class GPEquivalenceTest(unittest.TestCase):
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
         self.y = obs_noise(self.ft, 0.1)
+        periodic_base = SquaredExponential(variance=1., lengthscales=0.5)
         self.covs = (
             (Matern12(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern32(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern52(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (RBF(variance=1., lengthscales=0.5, order=15, balancing_iter=10), 1e-2, 1e-2),
+            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-2, 1e-2)
         )
         self.covs += ((self.covs[0][0] + self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
         self.covs += ((self.covs[0][0] * self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
