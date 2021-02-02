@@ -24,7 +24,7 @@ def get_lssm_spec(dim, T):
     return LGSSM(P0_spec, Fs_spec, Qs_spec, H_spec, R_spec)
 
 
-# @tf.function
+# # @tf.function
 def _get_ssm(sde, ts, R, t0=0.):
     dtype = config.default_float()
     n = tf.shape(sde.F)[0]

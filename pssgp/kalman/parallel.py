@@ -1,5 +1,4 @@
 import math
-from functools import partial
 
 import tensorflow as tf
 from tensorflow_probability.python.distributions import MultivariateNormalTriL
@@ -11,7 +10,7 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-#@tf.function
+# # @tf.function
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     def _res_nan():
         A = tf.zeros_like(F)
@@ -45,7 +44,7 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
     return res
 
 
-@tf.function
+# @tf.function
 def _generic_filtering_element_nan(F, Q):
     A = F
     b = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
@@ -56,7 +55,7 @@ def _generic_filtering_element_nan(F, Q):
     return A, b, C, J, eta
 
 
-@tf.function
+# @tf.function
 def _generic_filtering_element(F, Q, H, R, y):
     S = H @ mm(Q, H, transpose_b=True) + R
     chol = tf.linalg.cholesky(S)
@@ -76,7 +75,7 @@ def _generic_filtering_element(F, Q, H, R, y):
     return A, b, C, J, eta
 
 
-@tf.function
+# @tf.function
 def _combine_nan_and_ok(ok_elem, nan_elem, ok_indices, nan_indices, n):
     elem_shape = (n,) + tuple(s for s in nan_elem.shape[1:])
     elem = tf.zeros(elem_shape, dtype=ok_elem.dtype)
@@ -85,7 +84,7 @@ def _combine_nan_and_ok(ok_elem, nan_elem, ok_indices, nan_indices, n):
     return elem
 
 
-@tf.function
+# @tf.function
 def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
     n = tf.shape(observations)[0]
     init_res = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])
@@ -110,7 +109,6 @@ def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
                  for first_e, gen_es in zip(init_res, gen_res))
 
 
-@tf.function
 def filtering_operator(elem1, elem2):
     # elem1, elem2 = elems
     A1, b1, C1, J1, eta1 = elem1
@@ -130,7 +128,7 @@ def filtering_operator(elem1, elem2):
     return A, b, C, J, eta
 
 
-@tf.function
+# DO NOT DECORATE
 def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
     with tf.name_scope("parallel_filter"):
         P0, Fs, Qs, H, R = lgssm
@@ -164,12 +162,12 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
         return final_elements[1], final_elements[2]
 
 
-@tf.function
+# @tf.function
 def last_smoothing_element(m, P):
     return tf.zeros_like(P), m, P
 
 
-@tf.function
+# @tf.function
 def generic_smoothing_element(F, Q, m, P):
     Pp = F @ mm(P, F, transpose_b=True) + Q
     chol = tf.linalg.cholesky(Pp)
@@ -179,7 +177,7 @@ def generic_smoothing_element(F, Q, m, P):
     return E, g, L
 
 
-@tf.function
+# @tf.function
 def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covariances):
     last_elems = last_smoothing_element(filtering_means[-1], filtering_covariances[-1])
     generic_elems = tf.vectorized_map(lambda z: generic_smoothing_element(*z),
@@ -189,7 +187,7 @@ def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covar
                  for gen_es, last_e in zip(generic_elems, last_elems))
 
 
-@tf.function
+# @tf.function
 def smoothing_operator(elems):
     elem1, elem2 = elems
     E1, g1, L1 = elem1
@@ -202,7 +200,7 @@ def smoothing_operator(elems):
     return E, g, L
 
 
-@tf.function
+# DO NOT DECORATE
 def pks(lgssm, ms, Ps, max_parallel=10000):
     max_num_levels = math.ceil(math.log2(max_parallel)) - 1
     _, Fs, Qs, *_ = lgssm
@@ -218,7 +216,7 @@ def pks(lgssm, ms, Ps, max_parallel=10000):
     return tf.reverse(final_elements[1], axis=[0]), tf.reverse(final_elements[2], axis=[0])
 
 
-@tf.function
+# DO NOT DECORATE
 def pkfs(model, observations, max_parallel=10000):
     fms, fPs = pkf(model, observations, False, max_parallel)
     return pks(model, fms, fPs, max_parallel)

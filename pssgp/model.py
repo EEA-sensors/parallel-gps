@@ -12,7 +12,7 @@ from pssgp.kalman.parallel import pkf, pkfs
 from pssgp.kalman.sequential import kf, kfs
 
 
-@tf.function
+# @tf.function
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -64,20 +64,25 @@ class StateSpaceGP(GPModel):
                  parallel=False,
                  max_parallel=10000,
                  ):
+
         self._noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
         super().__init__(kernel, None, None, num_latent_gps=ys.shape[-1])
         self.data = ts, ys
         filter_spec = kernel.get_spec(ts.shape[0])
+        filter_ys_spec = tf.TensorSpec((ts.shape[0], 1), config.default_float())
         smoother_spec = kernel.get_spec(None)
-        ys_spec = tf.TensorSpec((None, 1), config.default_float())
+        smoother_ys_spec = tf.TensorSpec((None, 1), config.default_float())
 
         if not parallel:
-            self._kf = kf.get_concrete_function(filter_spec, ys_spec, True, False)
-            self._kfs = kfs.get_concrete_function(smoother_spec, ys_spec)
+            self._kf = tf.function(partial(kf, return_loglikelihood=True, return_predicted=False),
+                                   input_signature=[filter_spec, filter_ys_spec])
+            self._kfs = tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
         else:
-            self._kf = pkf.get_concrete_function(filter_spec, ys_spec, True, max_parallel)
-            self._kfs = pkfs.get_concrete_function(smoother_spec, ys_spec, max_parallel)
+            self._kf = tf.function(partial(pkf, return_loglikelihood=True, max_parallel=max_parallel),
+                                   input_signature=[filter_spec, filter_ys_spec])
+            self._kfs = tf.function(partial(pkfs, max_parallel=max_parallel),
+                                    input_signature=[smoother_spec, smoother_ys_spec])
 
     def _make_model(self, ts):
         with tf.name_scope("make_model"):

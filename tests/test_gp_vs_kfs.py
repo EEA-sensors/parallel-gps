@@ -8,10 +8,9 @@ import gpflow as gpf
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
-
 from gpflow.kernels import SquaredExponential
+
 from pssgp.kernels import RBF, SDEPeriodic
-from pssgp.kernels.base import SDESum, SDEProduct
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
@@ -26,7 +25,7 @@ def setUpModule():  # noqa: unittest syntax.
 class GPEquivalenceTest(unittest.TestCase):
 
     def setUp(self):
-        self.T = 100
+        self.T = 2000
         self.K = 50
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
@@ -37,7 +36,7 @@ class GPEquivalenceTest(unittest.TestCase):
             (Matern32(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern52(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (RBF(variance=1., lengthscales=0.5, order=15, balancing_iter=10), 1e-2, 1e-2),
-            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-2, 1e-2)
+            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-3, 1e-3)
         )
         self.covs += ((self.covs[1][0] + self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
         self.covs += ((self.covs[1][0] * self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
@@ -46,6 +45,7 @@ class GPEquivalenceTest(unittest.TestCase):
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
+            print("cov: ", cov)
 
             check_grad_vars = cov.trainable_variables
 
@@ -58,21 +58,18 @@ class GPEquivalenceTest(unittest.TestCase):
                 gp_model_ll = gp_model.maximum_log_likelihood_objective()
             gp_model_grad = tape.gradient(gp_model_ll, check_grad_vars)
 
-            for parallel in [True]:
-                tic = time.time()
+            for parallel in [False, True]:
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
                                         parallel=parallel,
                                         max_parallel=self.T + self.K)
-                print(time.time() - tic)
                 with tf.GradientTape() as tape:
                     tape.watch(check_grad_vars)
-                    tic = time.time()
                     ss_model_ll = ss_model.maximum_log_likelihood_objective()
-                    print(time.time() - tic)
-                print(ss_model._kf.pretty_printed_concrete_signatures)
                 ss_model_grad = tape.gradient(ss_model_ll, check_grad_vars)
+                ss_model_ll = ss_model.maximum_log_likelihood_objective()
+
                 npt.assert_allclose(gp_model_ll,
                                     ss_model_ll,
                                     atol=val_tol,
