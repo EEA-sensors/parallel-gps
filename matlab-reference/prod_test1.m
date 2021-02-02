@@ -38,7 +38,7 @@
 
     clf;
     y = matcov(t,3/2,magnSigma2_1,lengthScale_1) .* matcov(t,5/2,magnSigma2_2,lengthScale_2);
-    h = plot(t,ss_cov(t,F,L,q,H,Pinf),t,y,'--');
+    h = plot(t,ss_cov(t,F,L,q,H),t,y,'--');
     set(h,'LineWidth',2)
     
     %%
@@ -53,10 +53,13 @@
     n = 6;
     
     [Pinf2,F2,L2,H2,q2] = se_to_ss(s^2,ell,n);
+    
     [Pinf,F,L,H,q] = prod_cov(Pinf1,F1,L1,H1,q1,Pinf2,F2,L2,H2,q2);
     
     clf;
+    t = -2:0.01:2;
     y = ss_cov(t,F1,L1,q1,H1) .* ss_cov(t,F2,L2,q2,H2);
     h = plot(t,ss_cov(t,F,L,q,H,Pinf),t,y,'--');
     set(h,'LineWidth',2)
+    
     

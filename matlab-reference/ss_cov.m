@@ -11,8 +11,7 @@
 function cov_approx = ss_cov(tau,F,L,q,H,Pinf)
 
     if nargin < 6
-        Pinf = lyapchol(F,L*sqrt(q));
-        Pinf = Pinf' * Pinf;
+        Pinf = solve_lyap(F,L,q);
     end
 
     % Initialize covariance
