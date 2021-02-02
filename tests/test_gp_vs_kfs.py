@@ -37,7 +37,7 @@ class GPEquivalenceTest(unittest.TestCase):
             (Matern32(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (Matern52(variance=1., lengthscales=0.5), 1e-6, 1e-2),
             (RBF(variance=1., lengthscales=0.5, order=15, balancing_iter=10), 1e-2, 1e-2),
-            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-2, 1e-2)
+            (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-1, 1e-1)
         )
         self.covs += ((self.covs[0][0] + self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
         self.covs += ((self.covs[0][0] * self.covs[1][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
@@ -46,8 +46,6 @@ class GPEquivalenceTest(unittest.TestCase):
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
-            if not isinstance(cov, SDEProduct):
-                continue
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,
@@ -59,7 +57,7 @@ class GPEquivalenceTest(unittest.TestCase):
                 gp_model_ll = gp_model.maximum_log_likelihood_objective()
             gp_model_grad = tape.gradient(gp_model_ll, check_grad_vars)
 
-            for parallel in [True]:
+            for parallel in [False]:
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
