@@ -1,5 +1,3 @@
-from functools import partial
-
 import tensorflow as tf
 
 __all__ = ["kf", "ks", "kfs"]
@@ -10,7 +8,6 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-# DO NOT DECORATE
 def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     P0, Fs, Qs, H, R = lgssm
     dtype = P0.dtype
@@ -49,7 +46,6 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
     return returned_values
 
 
-# DO NOT DECORATE
 def ks(lgssm, ms, Ps, mps, Pps):
     _, Fs, Qs, *_ = lgssm
 
@@ -71,7 +67,6 @@ def ks(lgssm, ms, Ps, mps, Pps):
     return sms, sPs
 
 
-# DO NOT DECORATE
 def kfs(model, observations):
     fms, fPs, mps, Pps = kf(model, observations, return_predicted=True)
     return ks(model, fms, fPs, mps, Pps)

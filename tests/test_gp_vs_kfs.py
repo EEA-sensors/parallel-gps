@@ -25,7 +25,7 @@ def setUpModule():  # noqa: unittest syntax.
 class GPEquivalenceTest(unittest.TestCase):
 
     def setUp(self):
-        self.T = 2000
+        self.T = 200
         self.K = 50
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
@@ -39,7 +39,7 @@ class GPEquivalenceTest(unittest.TestCase):
             (SDEPeriodic(periodic_base, period=0.5, order=10), 1e-3, 1e-3)
         )
         self.covs += ((self.covs[1][0] + self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the sum
-        self.covs += ((self.covs[1][0] * self.covs[2][0], 1e-6, 1e-2),)  # whatever that means, just testing the prod
+        self.covs += ((self.covs[1][0] * self.covs[2][0], 1e-6, 1e-1),)  # whatever that means, just testing the prod
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
@@ -89,13 +89,15 @@ class GPEquivalenceTest(unittest.TestCase):
                                       mean_function=None)
             mean_gp, var_gp = gp_model.predict_f(query)
             for parallel in [False, True]:
+                print(parallel)
                 ss_model = StateSpaceGP(data=self.data,
                                         kernel=cov,
                                         noise_variance=0.1,
                                         parallel=parallel,
                                         max_parallel=self.T + self.K)
                 mean_ss, var_ss = ss_model.predict_f(query)
-                npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0], atol=val_tol, rtol=val_tol)
+                npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0],
+                                    atol=val_tol, rtol=val_tol)
 
 
 if __name__ == '__main__':

@@ -125,10 +125,10 @@ def filtering_operator(elem1, elem2):
     temp = tf.linalg.solve(I + J2 @ C1, A1, adjoint=True)
     eta = mv(temp, eta2 - mv(J2, b1), transpose_a=True) + eta1
     J = mm(temp, J2 @ A1, transpose_a=True) + J1
+
     return A, b, C, J, eta
 
 
-# DO NOT DECORATE
 def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
     with tf.name_scope("parallel_filter"):
         P0, Fs, Qs, H, R = lgssm
@@ -138,8 +138,6 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
         max_num_levels = math.ceil(math.log2(max_parallel)) - 1
         initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
-        # def vectorized_operator(a, b):
-        #     return tf.vectorized_map(filtering_operator, (a, b), fallback_to_while_loop=False)
         final_elements = scan_associative(filtering_operator,
                                           initial_elements,
                                           max_num_levels=max_num_levels)
@@ -162,12 +160,10 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
         return final_elements[1], final_elements[2]
 
 
-# @tf.function
 def last_smoothing_element(m, P):
     return tf.zeros_like(P), m, P
 
 
-# @tf.function
 def generic_smoothing_element(F, Q, m, P):
     Pp = F @ mm(P, F, transpose_b=True) + Q
     chol = tf.linalg.cholesky(Pp)
@@ -177,7 +173,6 @@ def generic_smoothing_element(F, Q, m, P):
     return E, g, L
 
 
-# @tf.function
 def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covariances):
     last_elems = last_smoothing_element(filtering_means[-1], filtering_covariances[-1])
     generic_elems = tf.vectorized_map(lambda z: generic_smoothing_element(*z),
@@ -187,7 +182,6 @@ def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covar
                  for gen_es, last_e in zip(generic_elems, last_elems))
 
 
-# @tf.function
 def smoothing_operator(elems):
     elem1, elem2 = elems
     E1, g1, L1 = elem1
@@ -200,7 +194,6 @@ def smoothing_operator(elems):
     return E, g, L
 
 
-# DO NOT DECORATE
 def pks(lgssm, ms, Ps, max_parallel=10000):
     max_num_levels = math.ceil(math.log2(max_parallel)) - 1
     _, Fs, Qs, *_ = lgssm
@@ -216,7 +209,6 @@ def pks(lgssm, ms, Ps, max_parallel=10000):
     return tf.reverse(final_elements[1], axis=[0]), tf.reverse(final_elements[2], axis=[0])
 
 
-# DO NOT DECORATE
 def pkfs(model, observations, max_parallel=10000):
     fms, fPs = pkf(model, observations, False, max_parallel)
     return pks(model, fms, fPs, max_parallel)

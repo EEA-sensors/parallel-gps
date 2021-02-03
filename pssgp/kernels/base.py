@@ -131,7 +131,7 @@ class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
     def get_spec(self, T):
         dim = 0
         for kernel in self.kernels:
-            ker_spec = kernel.get_lssm_spec()
+            ker_spec = kernel.get_spec(T)
             if ker_spec is None:
                 return None
             ker_P0_spec = ker_spec.P0
@@ -182,7 +182,7 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
     def get_spec(self, T):
         dim = 1
         for kernel in self.kernels:
-            ker_spec = kernel.get_lssm_spec()
+            ker_spec = kernel.get_spec(T)
             if ker_spec is None:
                 return None
             ker_P0_spec = ker_spec.P0

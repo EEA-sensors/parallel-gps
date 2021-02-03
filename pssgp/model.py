@@ -62,7 +62,7 @@ class StateSpaceGP(GPModel):
                  kernel,
                  noise_variance: float = 1.0,
                  parallel=False,
-                 max_parallel=10000,
+                 max_parallel=10000
                  ):
 
         self._noise_variance = Parameter(noise_variance, transform=positive())
@@ -77,9 +77,9 @@ class StateSpaceGP(GPModel):
         if not parallel:
             self._kf = tf.function(partial(kf, return_loglikelihood=True, return_predicted=False),
                                    input_signature=[filter_spec, filter_ys_spec])
-            self._kfs = tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
+            self._kfs = kfs  # tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
         else:
-            self._kf = tf.function(partial(pkf, return_loglikelihood=True, max_parallel=max_parallel),
+            self._kf = tf.function(partial(pkf, return_loglikelihood=True, max_parallel=ts.shape[0]),
                                    input_signature=[filter_spec, filter_ys_spec])
             self._kfs = tf.function(partial(pkfs, max_parallel=max_parallel),
                                     input_signature=[smoother_spec, smoother_ys_spec])
@@ -94,6 +94,7 @@ class StateSpaceGP(GPModel):
             self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
     ) -> MeanAndVariance:
         ts, ys = self.data
+
         squeezed_ts = tf.squeeze(ts)
         squeezed_Xnew = tf.squeeze(Xnew)
         float_ys = float("nan") * tf.ones((Xnew.shape[0], ys.shape[1]), dtype=ys.dtype)
@@ -104,7 +105,9 @@ class StateSpaceGP(GPModel):
         #  this merging is equivalent to using argsort but uses O(log(T)) operations instead.
         ssm = self._make_model(all_ts[:, None])
         sms, sPs = self._kfs(ssm, all_ys)
-        return tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
+        res =  tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
+        return tf.linalg.matvec(ssm.H, res[0]), tf.linalg.matmul(ssm.H, tf.linalg.matmul(res[1], ssm.H, transpose_b=True))[:, None]
+
 
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
         ts, Y = self.data
