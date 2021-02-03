@@ -105,9 +105,11 @@ class StateSpaceGP(GPModel):
         #  this merging is equivalent to using argsort but uses O(log(T)) operations instead.
         ssm = self._make_model(all_ts[:, None])
         sms, sPs = self._kfs(ssm, all_ys)
-        res =  tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
-        return tf.linalg.matvec(ssm.H, res[0]), tf.linalg.matmul(ssm.H, tf.linalg.matmul(res[1], ssm.H, transpose_b=True))[:, None]
-
+        res = tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
+        return tf.linalg.matvec(ssm.H, res[0]), tf.linalg.diag_part(tf.linalg.matmul(ssm.H,
+                                                                                     tf.linalg.matmul(res[1],
+                                                                                                      ssm.H,
+                                                                                                      transpose_b=True)))
 
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
         ts, Y = self.data

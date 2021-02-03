@@ -96,7 +96,9 @@ class GPEquivalenceTest(unittest.TestCase):
                                         parallel=parallel,
                                         max_parallel=self.T + self.K)
                 mean_ss, var_ss = ss_model.predict_f(query)
-                npt.assert_allclose(mean_gp[:, 0], mean_ss[:, 0],
+                npt.assert_allclose(mean_gp, mean_ss,
+                                    atol=val_tol, rtol=val_tol)
+                npt.assert_allclose(var_gp, var_ss,
                                     atol=val_tol, rtol=val_tol)
 
 
