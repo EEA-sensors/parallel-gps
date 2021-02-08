@@ -1,7 +1,7 @@
 from functools import partial
 
 import tensorflow as tf
-from gpflow import Parameter
+from gpflow import Parameter, config
 from gpflow.models import GPModel
 from gpflow.models.model import MeanAndVariance
 from gpflow.models.training_mixins import InputData, RegressionData
@@ -12,7 +12,7 @@ from pssgp.kalman.parallel import pkf, pkfs
 from pssgp.kalman.sequential import kf, kfs
 
 
-@tf.function
+# @tf.function
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -62,17 +62,27 @@ class StateSpaceGP(GPModel):
                  kernel,
                  noise_variance: float = 1.0,
                  parallel=False,
+                 max_parallel=10000
                  ):
+
         self._noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
         super().__init__(kernel, None, None, num_latent_gps=ys.shape[-1])
         self.data = ts, ys
+        filter_spec = kernel.get_spec(ts.shape[0])
+        filter_ys_spec = tf.TensorSpec((ts.shape[0], 1), config.default_float())
+        smoother_spec = kernel.get_spec(None)
+        smoother_ys_spec = tf.TensorSpec((None, 1), config.default_float())
+
         if not parallel:
-            self._kf = kf
-            self._kfs = kfs
+            self._kf = tf.function(partial(kf, return_loglikelihood=True, return_predicted=False),
+                                   input_signature=[filter_spec, filter_ys_spec])
+            self._kfs = tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
         else:
-            self._kf = pkf
-            self._kfs = pkfs
+            self._kf = tf.function(partial(pkf, return_loglikelihood=True, max_parallel=ts.shape[0]),
+                                   input_signature=[filter_spec, filter_ys_spec])
+            self._kfs = tf.function(partial(pkfs, max_parallel=max_parallel),
+                                    input_signature=[smoother_spec, smoother_ys_spec])
 
     def _make_model(self, ts):
         with tf.name_scope("make_model"):
@@ -84,6 +94,7 @@ class StateSpaceGP(GPModel):
             self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
     ) -> MeanAndVariance:
         ts, ys = self.data
+
         squeezed_ts = tf.squeeze(ts)
         squeezed_Xnew = tf.squeeze(Xnew)
         float_ys = float("nan") * tf.ones((Xnew.shape[0], ys.shape[1]), dtype=ys.dtype)
@@ -94,10 +105,14 @@ class StateSpaceGP(GPModel):
         #  this merging is equivalent to using argsort but uses O(log(T)) operations instead.
         ssm = self._make_model(all_ts[:, None])
         sms, sPs = self._kfs(ssm, all_ys)
-        return tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
+        res = tf.boolean_mask(sms, all_flags, 0), tf.boolean_mask(sPs, all_flags, 0)
+        return tf.linalg.matvec(ssm.H, res[0]), tf.linalg.diag_part(tf.linalg.matmul(ssm.H,
+                                                                                     tf.linalg.matmul(res[1],
+                                                                                                      ssm.H,
+                                                                                                      transpose_b=True)))
 
     def maximum_log_likelihood_objective(self) -> tf.Tensor:
         ts, Y = self.data
         ssm = self._make_model(ts)
-        fms, fPs, ll = self._kf(ssm, Y, True)
+        fms, fPs, ll = self._kf(ssm, Y)
         return ll

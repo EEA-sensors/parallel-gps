@@ -22,7 +22,7 @@ class PeriodicTest(unittest.TestCase):
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
-        periodic_order = 6
+        periodic_order = 2
         periodic_base_kernel = SquaredExponential(variance=1., lengthscales=0.1)
         self.cov = SDEPeriodic(periodic_base_kernel, period=1., order=periodic_order)
 
@@ -40,7 +40,6 @@ class PeriodicTest(unittest.TestCase):
                                                        [0.5, 0.5, 0.5]]), decimal=8)
 
     def test_sde_coeff(self):
-        # Cross-check with [Pinf,F,L,H,q] = per_to_ss(1, 0.1*sqrt(2), 1, 2)
         F_expected = np.zeros((6, 6))
         F_expected[2, 3] = -6.283185307179586
         F_expected[4, 5] = -12.5663706143592

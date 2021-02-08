@@ -13,7 +13,18 @@ from pssgp.kalman.base import LGSSM
 ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L", "H", "Q"])
 
 
-@tf.function
+def get_lssm_spec(dim, T):
+    dtype = config.default_float()
+    P0_spec = tf.TensorSpec((dim, dim), dtype=dtype)
+    Fs_spec = tf.TensorSpec((T, dim, dim), dtype=dtype)
+    Qs_spec = tf.TensorSpec((T, dim, dim), dtype=dtype)
+    H_spec = tf.TensorSpec((1, dim), dtype=dtype)
+    R_spec = tf.TensorSpec((1, 1), dtype=dtype)
+
+    return LGSSM(P0_spec, Fs_spec, Qs_spec, H_spec, R_spec)
+
+
+# # @tf.function
 def _get_ssm(sde, ts, R, t0=0.):
     dtype = config.default_float()
     n = tf.shape(sde.F)[0]
@@ -85,6 +96,10 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
     def __mul__(self, other):
         return SDEProduct([self, other])  # noqa: don't complain Pycharm, I know what's good for you.
 
+    @abc.abstractmethod
+    def get_spec(self, T):
+        return None
+
 
 def _sde_combination_init(self, kernels: List[Kernel], name: Optional[str] = None, **kargs):
     if not all(isinstance(k, SDEKernelMixin) for k in kernels):
@@ -112,6 +127,16 @@ def block_diag(arrs):
 
 class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
     __init__ = _sde_combination_init
+
+    def get_spec(self, T):
+        dim = 0
+        for kernel in self.kernels:
+            ker_spec = kernel.get_spec(T)
+            if ker_spec is None:
+                return None
+            ker_P0_spec = ker_spec.P0
+            dim += ker_P0_spec.shape[-1]
+        return get_lssm_spec(dim, T)
 
     @staticmethod
     def _block_diagonal(matrices, is_positive_definite=False, square=True):
@@ -153,7 +178,16 @@ class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
 
 class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
     __init__ = _sde_combination_init
-    _LOW_LIM = 1e-6
+
+    def get_spec(self, T):
+        dim = 1
+        for kernel in self.kernels:
+            ker_spec = kernel.get_spec(T)
+            if ker_spec is None:
+                return None
+            ker_P0_spec = ker_spec.P0
+            dim *= ker_P0_spec.shape[-1]
+        return get_lssm_spec(dim, T)
 
     @staticmethod
     def _combine_F(op1, op2):
@@ -167,20 +201,16 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
 
     @staticmethod
     def _combine_Q(sde1, sde2):
-        gamma1 = tf.linalg.LinearOperatorFullMatrix(sde1.L @ sde1.Q @ tf.transpose(sde1.L))
-        gamma2 = tf.linalg.LinearOperatorFullMatrix(sde2.L @ sde2.Q @ tf.transpose(sde2.L))
-        Pinf1 = tf.linalg.LinearOperatorFullMatrix(sde1.P0)
-        Pinf2 = tf.linalg.LinearOperatorFullMatrix(sde2.P0)
+        gamma1 = tf.linalg.LinearOperatorFullMatrix(sde1.L @ sde1.Q @ tf.transpose(sde1.L), is_positive_definite=True,
+                                                    is_self_adjoint=True)
+        gamma2 = tf.linalg.LinearOperatorFullMatrix(sde2.L @ sde2.Q @ tf.transpose(sde2.L), is_positive_definite=True,
+                                                    is_self_adjoint=True)
+        Pinf1 = tf.linalg.LinearOperatorFullMatrix(sde1.P0, is_positive_definite=True, is_self_adjoint=True)
+        Pinf2 = tf.linalg.LinearOperatorFullMatrix(sde2.P0, is_positive_definite=True, is_self_adjoint=True)
 
         kron_1 = tf.linalg.LinearOperatorKronecker([gamma1, Pinf2])
         kron_2 = tf.linalg.LinearOperatorKronecker([Pinf1, gamma2])
         return kron_1.to_dense() + kron_2.to_dense()
-
-    @classmethod
-    def _filter_Q(cls, Q, P0):
-        Q_zero = tf.reduce_all(tf.abs(Q) < cls._LOW_LIM)
-        return tf.linalg.LinearOperatorFullMatrix(tf.cond(Q_zero, lambda: P0, lambda: Q),
-                                                  is_positive_definite=True)
 
     def get_sde(self) -> ContinuousDiscreteModel:
         """
@@ -198,7 +228,8 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
 
         F = reduce(self._combine_F, [sde.F for sde in sdes])
         Q = reduce(self._combine_Q, [sde for sde in sdes])
-        P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True)
+        P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True,
+                                                                                   is_self_adjoint=True)
                                                 for sde in sdes]).to_dense()
         H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H)
                                                for sde in sdes]).to_dense()
