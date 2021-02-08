@@ -4,7 +4,7 @@ import tensorflow as tf
 from gpflow import Parameter, config
 from gpflow.models import GPModel
 from gpflow.models.model import MeanAndVariance
-from gpflow.models.training_mixins import InputData, RegressionData
+from gpflow.models.training_mixins import InputData, RegressionData, InternalDataTrainingLossMixin
 from gpflow.models.util import data_input_to_tensor
 from gpflow.utilities import positive
 
@@ -56,7 +56,7 @@ def _merge_sorted(a, b, *args):
         return (_inner_merge(a, b),) + tuple(_inner_merge(i, j) for i, j in args)
 
 
-class StateSpaceGP(GPModel):
+class StateSpaceGP(GPModel, InternalDataTrainingLossMixin):
     def __init__(self,
                  data: RegressionData,
                  kernel,
