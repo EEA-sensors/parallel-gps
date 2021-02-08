@@ -77,7 +77,7 @@ class StateSpaceGP(GPModel):
         if not parallel:
             self._kf = tf.function(partial(kf, return_loglikelihood=True, return_predicted=False),
                                    input_signature=[filter_spec, filter_ys_spec])
-            self._kfs = kfs  # tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
+            self._kfs = tf.function(kfs, input_signature=[smoother_spec, smoother_ys_spec])
         else:
             self._kf = tf.function(partial(pkf, return_loglikelihood=True, max_parallel=ts.shape[0]),
                                    input_signature=[filter_spec, filter_ys_spec])

@@ -10,7 +10,6 @@ mv = tf.linalg.matvec
 mm = tf.linalg.matmul
 
 
-# # @tf.function
 def first_filtering_element(m0, P0, F, Q, H, R, y):
     def _res_nan():
         A = tf.zeros_like(F)
@@ -44,7 +43,6 @@ def first_filtering_element(m0, P0, F, Q, H, R, y):
     return res
 
 
-# @tf.function
 def _generic_filtering_element_nan(F, Q):
     A = F
     b = tf.zeros((tf.shape(F)[0],), dtype=F.dtype)
@@ -55,7 +53,6 @@ def _generic_filtering_element_nan(F, Q):
     return A, b, C, J, eta
 
 
-# @tf.function
 def _generic_filtering_element(F, Q, H, R, y):
     S = H @ mm(Q, H, transpose_b=True) + R
     chol = tf.linalg.cholesky(S)
@@ -75,7 +72,6 @@ def _generic_filtering_element(F, Q, H, R, y):
     return A, b, C, J, eta
 
 
-# @tf.function
 def _combine_nan_and_ok(ok_elem, nan_elem, ok_indices, nan_indices, n):
     elem_shape = (n,) + tuple(s for s in nan_elem.shape[1:])
     elem = tf.zeros(elem_shape, dtype=ok_elem.dtype)
@@ -84,7 +80,6 @@ def _combine_nan_and_ok(ok_elem, nan_elem, ok_indices, nan_indices, n):
     return elem
 
 
-# @tf.function
 def make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations):
     n = tf.shape(observations)[0]
     init_res = first_filtering_element(m0, P0, Fs[0], Qs[0], H, R, observations[0])

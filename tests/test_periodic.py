@@ -22,7 +22,7 @@ class PeriodicTest(unittest.TestCase):
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
-        periodic_order = 6
+        periodic_order = 2
         periodic_base_kernel = SquaredExponential(variance=1., lengthscales=0.1)
         self.cov = SDEPeriodic(periodic_base_kernel, period=1., order=periodic_order)
 
