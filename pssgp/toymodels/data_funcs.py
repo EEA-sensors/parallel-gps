@@ -8,16 +8,16 @@ def sinu(t: np.ndarray) -> np.ndarray:
     """
     A sinusoidal test function. 
     
-    y = sin(2 pi t) + sin(4 pi t) + cos(6 pi t) 
+    y = sin(pi t) + sin(2 pi t) + cos(3 pi t)
     
     Args:
         t:  (n, ) Input (time)
     Return:
         y:  (n, ) y(t)
     """
-    return np.sin(2 * np.pi * t) \
-           + np.sin(4 * np.pi * t) \
-           + np.cos(6 * np.pi * t)
+    return np.sin(np.pi * t) \
+           + np.sin(2 * np.pi * t) \
+           + np.cos(3 * np.pi * t)
 
 
 def comp_sinu(t: np.ndarray) -> np.ndarray:
