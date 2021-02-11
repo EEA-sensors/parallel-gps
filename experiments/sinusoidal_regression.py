@@ -19,6 +19,7 @@ from tensorflow_probability.python.distributions import Normal
 from pssgp.kernels import RBF, Matern32
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
+from pssgp.misc_utils import rmse, error_shade
 
 import enum
 
@@ -41,7 +42,8 @@ class CovFuncEnum(enum.Enum):
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('N', 1000, 'Number of measurements.')
+flags.DEFINE_integer('Nm', 400, 'Number of measurements.')
+flags.DEFINE_integer('Np', 500, 'Number of predictions.')
 flags.DEFINE_string('model', ModelEnum.SSGP.value, 'Select model to run. Options are gp, ssgp, and pssgp.')
 flags.DEFINE_string('cov', CovFuncEnum.Matern32.value, 'Covariance function.')
 flags.DEFINE_string('inference_method', InferenceMethodEnum.MAP.value, 'How to learn hyperparameters. MAP or HMC.')
@@ -49,7 +51,7 @@ flags.DEFINE_integer('n_samples', 100, 'Number of HMC samples')
 flags.DEFINE_integer('burnin', 100, 'Burning-in steps of HMC')
 flags.DEFINE_integer('rbf_order', 6, 'Order of ss-RBF approximation.', lower_bound=1)
 flags.DEFINE_integer('rbf_balance_iter', 10, 'Iterations of RBF balancing.', lower_bound=1)
-flags.DEFINE_boolean('plot', True, 'Plot the results. Flag it to False in Triton.')
+flags.DEFINE_boolean('plot', False, 'Plot the results. Flag it to False in Triton.')
 
 gp_dtype = gpf.config.default_float()
 f64 = gpf.utilities.to_default_float
@@ -100,58 +102,61 @@ def map(model):
     _ = tape.gradient(val, model.trainable_variables)
 
     opt_logs = opt.minimize(model.training_loss, model.trainable_variables,
-                            options=dict(maxiter=100, disp=True))
+                            method='L-BFGS-B', options=dict(maxiter=100, disp=True))
     print_summary(model)
 
 
 def run(argv):
     np.random.seed(2021)
     tf.random.set_seed(2021)
-    N = FLAGS.N
+    Nm, Np = FLAGS.Nm, FLAGS.Np
     model_name = ModelEnum(FLAGS.model)
     cov_name = CovFuncEnum(FLAGS.cov)
     inference_method = InferenceMethodEnum(FLAGS.inference_method)
 
-    # Load data
-    t = np.linspace(-2, 2, N)
+    # Generate data
+    t = np.linspace(0, 4, Nm)
     ft = sinu(t)
     y = obs_noise(ft, 0.1)
     data = (tf.constant(t[:, None], dtype=gp_dtype),
             tf.constant(y[:, None], dtype=gp_dtype))
-    # TODO: Number of query points?
+
+    t_pred = np.linspace(0, 4, Np).reshape(-1, 1)
+    ft_pred = sinu(t_pred)
 
     # Prepare cov
     if cov_name == CovFuncEnum.Matern32:
         cov_func = Matern32(variance=1.,
                             lengthscales=0.5)
-        cov_func.lengthscales.prior = Normal(0.5, 2)
-        cov_func.variance.prior = Normal(1, 2)
-    elif cov_name == CovFuncEnum.Matern32:
+
+    elif cov_name == CovFuncEnum.RBF:
         cov_func = RBF(variance=1.,
                        lengthscales=0.5,
                        order=FLAGS.rbf_order, balancing_iter=FLAGS.rbf_balance_iter)
-        cov_func.lengthscales.prior = Normal(0.5, 2)
-        cov_func.variance.prior = Normal(1, 2)
     else:
         raise ValueError('Covariance function not found')
+    cov_func.lengthscales.prior = Normal(f64(0.5), f64(2))
+    cov_func.variance.prior = Normal(f64(1.), f64(2.))
 
     if model_name == ModelEnum.GP:
         model = gpf.models.GPR(data=data,
                                kernel=cov_func,
                                noise_variance=1.,
                                mean_function=None)
+        model.likelihood.variance.prior = Normal(f64(0.5), f64(1.))
     elif model_name == ModelEnum.SSGP:
         model = StateSpaceGP(data=data,
                              kernel=cov_func,
                              noise_variance=1.,
-                             parallel=False,
-                             max_parallel=4000)
+                             parallel=False)
+        model._noise_variance.prior = Normal(f64(0.5), f64(1.))
     elif model_name == ModelEnum.PSSGP:
         model = StateSpaceGP(data=data,
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=True,
                              max_parallel=4000)
+        model._noise_variance.prior = Normal(f64(0.5), f64(1.))
     else:
         raise ValueError('Model {} not found.'.format(FLAGS.model))
 
@@ -163,30 +168,29 @@ def run(argv):
     elif inference_method == InferenceMethodEnum.HMC:
         hmc(model)
     else:
-        ValueError('Method not found.')
+        ValueError('Method {} not found.'.format(inference_method))
 
     print('>>>>>>>Making predictions.')
-    m, cov = model.predict_f(val_t)
+    m, cov = model.predict_f(t_pred)
+    print('>>>>>>>RMSE: {}.'.format(rmse(m, ft_pred)))
 
-    filename = 'results/sinu_{}_{}_{}_{}_{}_{}_{}_{}.npz'.format(FLAGS.N,
-                                                                 FLAGS.model,
-                                                                 FLAGS.cov,
-                                                                 FLAGS.inference_method,
-                                                                 FLAGS.n_samples,
-                                                                 FLAGS.burnin,
-                                                                 FLAGS.rbf_order,
-                                                                 FLAGS.rbf_balance_iter)
-    np.savez(filename, m, cov)
+    filename = 'results/sinu_{}_{}_{}_{}_{}_{}_{}_{}_{}.npz'.format(FLAGS.Nm,
+                                                                    FLAGS.Np,
+                                                                    FLAGS.model,
+                                                                    FLAGS.cov,
+                                                                    FLAGS.inference_method,
+                                                                    FLAGS.n_samples,
+                                                                    FLAGS.burnin,
+                                                                    FLAGS.rbf_order,
+                                                                    FLAGS.rbf_balance_iter)
+    np.savez(filename, m, cov, t, y, t_pred, rmse(m, ft_pred))
     print('>>>>>>>File save to {}'.format(filename))
 
     if FLAGS.plot:
         plt.scatter(t, y, label='Measurements', s=1)
         plt.plot(t, ft, label='True')
-        plt.plot(t, m, label='predicted')
-        plt.fill_between(t,
-                         m - 1.96 * np.sqrt(cov),
-                         m + 1.96 * np.sqrt(cov),
-                         alpha=0.2)
+        plt.plot(t_pred, m, label='predicted')
+        error_shade(t_pred, m, cov, alpha=0.2, label='.95 conf')
         plt.legend()
         plt.show()
 
