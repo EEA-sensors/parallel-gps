@@ -158,7 +158,7 @@ def run(argv):
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=True,
-                             max_parallel=4000)
+                             max_parallel=Nm + Np)
         model.noise_variance.prior = Normal(f64(0.5), f64(1.))
     else:
         raise ValueError('Model {} not found.'.format(FLAGS.model))

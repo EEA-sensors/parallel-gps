@@ -37,13 +37,13 @@ flags.DEFINE_string('inference_method', InferenceMethodEnum.HMC.value, 'How to l
 flags.DEFINE_integer('periodic_order', 3, 'Order of ss-periodic approximation.', lower_bound=1)
 flags.DEFINE_integer('burnin', 50, 'Burnin samples for the MCMC.', lower_bound=1)
 flags.DEFINE_integer('n_samples', 50, 'Number of samples required for the MCMC.', lower_bound=1)
-flags.DEFINE_float('co2_split_time', 2013.7247, 'Time to split the training and validation CO2 data.', lower_bound=1)
-flags.DEFINE_boolean('plot', True, 'Plot the results. Flag it to False in Triton.')
+flags.DEFINE_float('co2_split_time', 2014, 'Time to split the training and validation CO2 data.', lower_bound=1)
+flags.DEFINE_boolean('plot', False, 'Plot the results. Flag it to False in Triton.')
 
 gp_dtype = gpf.config.default_float()
 
 
-def load_co2_data(split_time: float = 2015.) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+def load_co2_data(split_time: float = 2014.) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
     """Load CO2 dataset
     """
     weekly = np.loadtxt('co2_weekly_mlo.txt')[:, 3:5]
@@ -205,11 +205,34 @@ def run(argv):
         params = map(model)
         print(params)
     elif inference_method == InferenceMethodEnum.HMC:
-        samples = hmc(model)
-        print(samples)
+        hmc_dict = hmc(model)
+        print(hmc_dict)
         _ = 1 + 1
     else:
-        ValueError()
+        raise ValueError('Method {} not found.'.format(inference_method))
+
+    # Make prediction and save results.
+    if inference_method == InferenceMethodEnum.HMC:
+        print('>>>>>>>Predictions are not used for HMC.')
+    else:
+        print('>>>>>>>Making predictions.')
+        m, cov = model.predict_f(val_t)
+
+    filename = 'results/co2_{}_{}_{}_{}_{}_{}_{}_{}_{}.npz'.format(FLAGS.Nm,
+                                                                   FLAGS.Np,
+                                                                   FLAGS.model,
+                                                                   FLAGS.cov,
+                                                                   FLAGS.inference_method,
+                                                                   FLAGS.n_samples,
+                                                                   FLAGS.burnin,
+                                                                   FLAGS.rbf_order,
+                                                                   FLAGS.rbf_balance_iter)
+    if inference_method == InferenceMethodEnum.HMC:
+        vars_to_save = [train_t + t0, train_y] + [item for field, item in hmc_dict.items()]
+    else:
+        vars_to_save = [m, cov, train_t + t0, train_y, val_t + t0, val_y]
+    np.savez(filename, *vars_to_save)
+    print('>>>>>>>File save to {}'.format(filename))
     #
     # if FLAGS.plot:
     #     plt.scatter(t0 + train_t, train_y, s=1)
