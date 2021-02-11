@@ -12,7 +12,6 @@ from pssgp.kalman.parallel import pkf, pkfs
 from pssgp.kalman.sequential import kf, kfs
 
 
-# @tf.function
 def _merge_sorted(a, b, *args):
     """
     Merge sorted arrays efficiently, inspired by https://stackoverflow.com/a/54131815
@@ -65,7 +64,7 @@ class StateSpaceGP(GPModel, InternalDataTrainingLossMixin):
                  max_parallel=10000
                  ):
 
-        self._noise_variance = Parameter(noise_variance, transform=positive())
+        self.noise_variance = Parameter(noise_variance, transform=positive())
         ts, ys = data_input_to_tensor(data)
         super().__init__(kernel, None, None, num_latent_gps=ys.shape[-1])
         self.data = ts, ys
@@ -86,7 +85,7 @@ class StateSpaceGP(GPModel, InternalDataTrainingLossMixin):
 
     def _make_model(self, ts):
         with tf.name_scope("make_model"):
-            R = tf.reshape(self._noise_variance, (1, 1))
+            R = tf.reshape(self.noise_variance, (1, 1))
             ssm = self.kernel.get_ssm(ts, R)
         return ssm
 

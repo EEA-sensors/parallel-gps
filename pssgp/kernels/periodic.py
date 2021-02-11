@@ -67,7 +67,7 @@ class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
         div_facto_K = tf.convert_to_tensor(div_facto_K, dtype=dtype)
 
         op_F = tf.linalg.LinearOperatorFullMatrix([[0, -w0], [w0, 0]])
-        op_diag = tf.linalg.LinearOperatorDiag(tf.range(0, N + 1, dtype=dtype))
+        op_diag = tf.linalg.LinearOperatorDiag(np.arange(0, N + 1, dtype=dtype))
         F = tf_kron([op_diag, op_F]).to_dense()
 
         L = tf.eye(2 * (N + 1), dtype=dtype)

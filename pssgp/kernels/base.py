@@ -24,11 +24,10 @@ def get_lssm_spec(dim, T):
     return LGSSM(P0_spec, Fs_spec, Qs_spec, H_spec, R_spec)
 
 
-# # @tf.function
 def _get_ssm(sde, ts, R, t0=0.):
     dtype = config.default_float()
     n = tf.shape(sde.F)[0]
-    t0 = tf.reshape(tf.cast(t0, dtype), (1, 1))
+    t0 = tf.reshape(tf.convert_to_tensor(t0, dtype=dtype), (1, 1))
 
     ts = tf.concat([t0, ts], axis=0)
     dts = tf.reshape(ts[1:] - ts[:-1], (-1, 1, 1))

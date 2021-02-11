@@ -46,7 +46,7 @@ flags.DEFINE_integer('Nm', 400, 'Number of measurements.')
 flags.DEFINE_integer('Np', 500, 'Number of predictions.')
 flags.DEFINE_string('model', ModelEnum.SSGP.value, 'Select model to run. Options are gp, ssgp, and pssgp.')
 flags.DEFINE_string('cov', CovFuncEnum.Matern32.value, 'Covariance function.')
-flags.DEFINE_string('inference_method', InferenceMethodEnum.MAP.value, 'How to learn hyperparameters. MAP or HMC.')
+flags.DEFINE_string('inference_method', InferenceMethodEnum.HMC.value, 'How to learn hyperparameters. MAP or HMC.')
 flags.DEFINE_integer('n_samples', 100, 'Number of HMC samples')
 flags.DEFINE_integer('burnin', 100, 'Burning-in steps of HMC')
 flags.DEFINE_integer('rbf_order', 6, 'Order of ss-RBF approximation.', lower_bound=1)
@@ -59,18 +59,18 @@ f64 = gpf.utilities.to_default_float
 
 def hmc(model):
     # :ref:`https://gpflow.readthedocs.io/en/master/notebooks/advanced/mcmc.html`
-    num_burnin_steps = ci_niter(300)
-    num_samples = ci_niter(500)
+    num_burnin_steps = FLAGS.burnin
+    num_samples = FLAGS.n_samples
 
     hmc_helper = gpf.optimizers.SamplingHelper(
         model.log_posterior_density, model.trainable_parameters
     )
 
     hmc = tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=hmc_helper.target_log_prob_fn, num_leapfrog_steps=10, step_size=0.01
+        target_log_prob_fn=hmc_helper.target_log_prob_fn, num_leapfrog_steps=10, step_size=0.1
     )
     adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
-        hmc, num_adaptation_steps=10, target_accept_prob=f64(0.75), adaptation_rate=0.1
+        hmc, num_adaptation_steps=10, target_accept_prob=0.25, adaptation_rate=0.1
     )
 
     with tf.GradientTape() as tape:
@@ -89,7 +89,6 @@ def hmc(model):
 
     samples, traces = run_chain_fn()
     parameter_samples = hmc_helper.convert_to_constrained_values(samples)
-    print(parameter_samples)
 
     param_to_name = {param: name for name, param in gpf.utilities.parameter_dict(model).items()}
 
