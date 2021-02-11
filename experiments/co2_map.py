@@ -100,9 +100,9 @@ def hmc(model):
             # trace_fn=lambda _, pkr: pkr.inner_results.inner_kernel.is_accepted,
         )
 
-    result = run_chain_fn()
+    result, all_traces = run_chain_fn()
     print(result)
-    parameter_samples = hmc_helper.convert_to_constrained_values(samples)
+    parameter_samples = hmc_helper.convert_to_constrained_values(result)
 
     return dict(zip(gpf.utilities.parameter_dict(model), parameter_samples))
 

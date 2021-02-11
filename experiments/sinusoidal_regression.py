@@ -15,6 +15,7 @@ from gpflow.kernels import SquaredExponential
 from gpflow.utilities import print_summary
 from gpflow.ci_utils import ci_niter
 from tensorflow_probability.python.distributions import Normal
+from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer
 
 from pssgp.kernels import RBF, Matern32
 from pssgp.model import StateSpaceGP
@@ -61,16 +62,19 @@ def hmc(model):
     # :ref:`https://gpflow.readthedocs.io/en/master/notebooks/advanced/mcmc.html`
     num_burnin_steps = FLAGS.burnin
     num_samples = FLAGS.n_samples
-
+    print_summary(model)
     hmc_helper = gpf.optimizers.SamplingHelper(
         model.log_posterior_density, model.trainable_parameters
     )
-
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=hmc_helper.target_log_prob_fn, num_leapfrog_steps=10, step_size=0.1
+    hmc = tfp.python.mcmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=hmc_helper.target_log_prob_fn, num_leapfrog_steps=10, step_size=0.01
     )
+    pbar = ProgressBarReducer(num_samples + num_burnin_steps)
+    pbar.initialize(None)
+    hmc = tfp.experimental.mcmc.WithReductions(hmc, pbar)
+
     adaptive_hmc = tfp.mcmc.SimpleStepSizeAdaptation(
-        hmc, num_adaptation_steps=10, target_accept_prob=0.25, adaptation_rate=0.1
+        hmc, num_adaptation_steps=10, target_accept_prob=0.25, adaptation_rate=0.01
     )
 
     with tf.GradientTape() as tape:
@@ -84,13 +88,13 @@ def hmc(model):
             num_burnin_steps=num_burnin_steps,
             current_state=hmc_helper.current_state,
             kernel=adaptive_hmc,
-            trace_fn=lambda _, pkr: pkr.inner_results.is_accepted,
+            # trace_fn=lambda _, pkr: pkr.inner_results.inner_kernel.is_accepted,
         )
 
-    samples, traces = run_chain_fn()
-    parameter_samples = hmc_helper.convert_to_constrained_values(samples)
+    result, all_traces = run_chain_fn()
+    parameter_samples = hmc_helper.convert_to_constrained_values(result)
 
-    param_to_name = {param: name for name, param in gpf.utilities.parameter_dict(model).items()}
+    return dict(zip(gpf.utilities.parameter_dict(model), parameter_samples))
 
 
 def map(model):
@@ -134,7 +138,7 @@ def run(argv):
                        order=FLAGS.rbf_order, balancing_iter=FLAGS.rbf_balance_iter)
     else:
         raise ValueError('Covariance function not found')
-    cov_func.lengthscales.prior = Normal(f64(0.5), f64(2))
+    cov_func.lengthscales.prior = Normal(f64(0.5), f64(2.))
     cov_func.variance.prior = Normal(f64(1.), f64(2.))
 
     if model_name == ModelEnum.GP:
@@ -148,14 +152,14 @@ def run(argv):
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=False)
-        model._noise_variance.prior = Normal(f64(0.5), f64(1.))
+        model.noise_variance.prior = Normal(f64(0.5), f64(1.))
     elif model_name == ModelEnum.PSSGP:
         model = StateSpaceGP(data=data,
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=True,
                              max_parallel=4000)
-        model._noise_variance.prior = Normal(f64(0.5), f64(1.))
+        model.noise_variance.prior = Normal(f64(0.5), f64(1.))
     else:
         raise ValueError('Model {} not found.'.format(FLAGS.model))
 
@@ -165,13 +169,18 @@ def run(argv):
     if inference_method == InferenceMethodEnum.MAP:
         map(model)
     elif inference_method == InferenceMethodEnum.HMC:
-        hmc(model)
+        hmc_dict = hmc(model)
+        print(hmc_dict)
+        _ = 1 + 1
     else:
         ValueError('Method {} not found.'.format(inference_method))
 
-    print('>>>>>>>Making predictions.')
-    m, cov = model.predict_f(t_pred)
-    print('>>>>>>>RMSE: {}.'.format(rmse(m, ft_pred)))
+    if inference_method == InferenceMethodEnum.HMC:
+        print('>>>>>>>Predictions are not used for HMC.')
+    else:
+        print('>>>>>>>Making predictions.')
+        m, cov = model.predict_f(t_pred)
+        print('>>>>>>>RMSE: {}.'.format(rmse(m, ft_pred)))
 
     filename = 'results/sinu_{}_{}_{}_{}_{}_{}_{}_{}_{}.npz'.format(FLAGS.Nm,
                                                                     FLAGS.Np,
@@ -182,10 +191,14 @@ def run(argv):
                                                                     FLAGS.burnin,
                                                                     FLAGS.rbf_order,
                                                                     FLAGS.rbf_balance_iter)
-    np.savez(filename, m, cov, t, y, t_pred, rmse(m, ft_pred))
+    if inference_method == InferenceMethodEnum.HMC:
+        vars_to_save = [t, y] + [item for field, item in hmc_dict.items()]
+    else:
+        vars_to_save = [m, cov, t, y, t_pred, rmse(m, ft_pred)]
+    np.savez(filename, *vars_to_save)
     print('>>>>>>>File save to {}'.format(filename))
 
-    if FLAGS.plot:
+    if FLAGS.plot and (inference_method != InferenceMethodEnum.HMC):
         plt.scatter(t, y, label='Measurements', s=1)
         plt.plot(t, ft, label='True')
         plt.plot(t_pred, m, label='predicted')
