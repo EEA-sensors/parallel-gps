@@ -51,13 +51,12 @@
     % Form the model. In reality we should optimize all magSigma2 and
     % lengthScale parameters but we don't now have derivatives.
     %
-    
     se_lengthScale = 100; 
     se_magnSigma2  = 1e4;
-    ma_lengthScale = 1;
-    ma_magnSigma2  = 0.5;
-    qp_lengthScale = 1;
-    qp_magnSigma2  = 5;
+    ma_lengthScale = 100;
+    ma_magnSigma2  = 1e5;
+    qp_lengthScale = 10;
+    qp_magnSigma2  = 100;
     period         = 1;
     mlengthScale   = 140
     damping        = 'matern32';
@@ -71,12 +70,13 @@
     m = zeros(size(Pinf,1),1);
     P = Pinf;
     R = 1;
-    
+
     all_t = [to;xt];
-    
+
     pred_m = zeros(1,length(all_t));
     pred_v = zeros(1,length(all_t));
-    
+
+    obj_val = 0;
     for k=1:length(all_t)
         if k > 1
             dt = all_t(k) - all_t(k-1);
@@ -88,13 +88,18 @@
         if k <= length(yn)
             S = H * P * H' + R;
             K = P * H' / S;
-            m = m + K * (yn(k) - H * m);
+            v = yn(k) - H * m;
+            m = m + K * v;
             P = P - K * S * K';
+            obj_val = obj_val - 0.5 * (v / S * v' + log(det(2 * pi*S)));
         end
-        
+
         pred_m(k) = H * m;
         pred_v(k) = H * P * H';
+
+
     end
+
     
     clf;
     h = plot(all_t,ymean + pred_m)

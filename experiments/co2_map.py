@@ -149,7 +149,7 @@ def run(argv):
     periodic_damping_cov = Matern32(variance=Normal(f64(1.), f64(2.)),
                                     lengthscales=Normal(f64(140.), f64(140.)))
 
-    co2_cov = rbf_cov + periodic_cov * periodic_damping_cov + m32_cov
+    co2_cov = periodic_cov * periodic_damping_cov + m32_cov
     # co2_cov = m32_cov + periodic_cov
 
     def run_gp():
