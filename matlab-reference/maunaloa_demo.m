@@ -53,10 +53,10 @@
     %
     se_lengthScale = 100; 
     se_magnSigma2  = 1e4;
-    ma_lengthScale = 100;
-    ma_magnSigma2  = 1e5;
-    qp_lengthScale = 10;
-    qp_magnSigma2  = 100;
+    ma_lengthScale = 1;
+    ma_magnSigma2  = 0.5;
+    qp_lengthScale = 1;
+    qp_magnSigma2  = 5;
     period         = 1;
     mlengthScale   = 140
     damping        = 'matern32';
@@ -76,7 +76,6 @@
     pred_m = zeros(1,length(all_t));
     pred_v = zeros(1,length(all_t));
 
-    obj_val = 0;
     for k=1:length(all_t)
         if k > 1
             dt = all_t(k) - all_t(k-1);
@@ -88,10 +87,8 @@
         if k <= length(yn)
             S = H * P * H' + R;
             K = P * H' / S;
-            v = yn(k) - H * m;
-            m = m + K * v;
+            m = m + K * (yn(k) - H * m);
             P = P - K * S * K';
-            obj_val = obj_val - 0.5 * (v / S * v' + log(det(2 * pi*S)));
         end
 
         pred_m(k) = H * m;
