@@ -1,3 +1,4 @@
+import math
 from functools import partial
 from typing import Tuple
 
@@ -29,17 +30,18 @@ def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
     --------
     se_to_ss.m
     """
-    B = np.sqrt(2 * np.pi)
-    A = np.zeros((2 * order + 1,))
+    dtype = config.default_float()
+    B = math.sqrt(2 * math.pi)
+    A = np.zeros((2 * order + 1,), dtype=dtype)
 
     i = 0
     for k in range(order, -1, -1):
-        A[i] = 0.5 ** k / np.math.factorial(k)
+        A[i] = 0.5 ** k / math.factorial(k)
         i = i + 2
 
     q = B / np.polyval(A, 0)
 
-    LA = np.real(A / ((1j) ** np.arange(A.size - 1, -1, -1)))
+    LA = np.real(A / (1j ** np.arange(A.size - 1, -1, -1, dtype=dtype)))
 
     AR = np.roots(LA)
 
@@ -51,14 +53,14 @@ def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
     GB = GB / GA[0]
     GA = GA / GA[0]
 
-    F = np.zeros((GA.size - 1, GA.size - 1))
+    F = np.zeros((GA.size - 1, GA.size - 1), dtype=dtype)
     F[-1, :] = -GA[:0:-1]
-    F[:-1, 1:] = np.eye(GA.size - 2)
+    F[:-1, 1:] = np.eye(GA.size - 2, dtype=dtype)
 
-    L = np.zeros((GA.size - 1, 1))
+    L = np.zeros((GA.size - 1, 1), dtype=dtype)
     L[-1, 0] = 1
 
-    H = np.zeros((1, GA.size - 1))
+    H = np.zeros((1, GA.size - 1), dtype=dtype)
     H[0, 0] = GB
 
     return F, L, H, q

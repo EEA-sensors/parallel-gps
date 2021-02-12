@@ -1,28 +1,22 @@
 # Regression experiments on sinusoidal signals.
 # Corresponds to the *** of paper.
 
-import timeit
+import enum
+
 import gpflow as gpf
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-import matplotlib.pyplot as plt
-
 from absl import app, flags
-from typing import Tuple
-
-from gpflow.kernels import SquaredExponential
 from gpflow.utilities import print_summary
-from gpflow.ci_utils import ci_niter
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer
 
 from pssgp.kernels import RBF, Matern32
+from pssgp.misc_utils import rmse, error_shade
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
-from pssgp.misc_utils import rmse, error_shade
-
-import enum
 
 
 class ModelEnum(enum.Enum):
@@ -43,23 +37,20 @@ class CovFuncEnum(enum.Enum):
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('Nm', 400, 'Number of measurements.')
+flags.DEFINE_integer('Nm', 1000, 'Number of measurements.')
 flags.DEFINE_integer('Np', 500, 'Number of predictions.')
-flags.DEFINE_string('model', ModelEnum.SSGP.value, 'Select model to run. Options are gp, ssgp, and pssgp.')
+flags.DEFINE_string('model', ModelEnum.PSSGP.value, 'Select model to run. Options are gp, ssgp, and pssgp.')
 flags.DEFINE_string('cov', CovFuncEnum.Matern32.value, 'Covariance function.')
-flags.DEFINE_string('inference_method', InferenceMethodEnum.HMC.value, 'How to learn hyperparameters. MAP or HMC.')
+flags.DEFINE_string('inference_method', InferenceMethodEnum.MAP.value, 'How to learn hyperparameters. MAP or HMC.')
+flags.DEFINE_string('dtype', "float32", 'GPFLOW default float type.')
 flags.DEFINE_integer('n_samples', 100, 'Number of HMC samples')
 flags.DEFINE_integer('burnin', 100, 'Burning-in steps of HMC')
 flags.DEFINE_integer('rbf_order', 6, 'Order of ss-RBF approximation.', lower_bound=1)
 flags.DEFINE_integer('rbf_balance_iter', 10, 'Iterations of RBF balancing.', lower_bound=1)
 flags.DEFINE_boolean('plot', False, 'Plot the results. Flag it to False in Triton.')
 
-gp_dtype = gpf.config.default_float()
-f64 = gpf.utilities.to_default_float
-
 
 def hmc(model):
-    # :ref:`https://gpflow.readthedocs.io/en/master/notebooks/advanced/mcmc.html`
     num_burnin_steps = FLAGS.burnin
     num_samples = FLAGS.n_samples
     print_summary(model)
@@ -110,6 +101,12 @@ def map(model):
 
 
 def run(argv):
+
+    gpf.config.set_default_float(getattr(np, FLAGS.dtype))
+
+    gp_dtype = gpf.config.default_float()
+    gpfloat = gpf.utilities.to_default_float
+
     np.random.seed(2021)
     tf.random.set_seed(2021)
     Nm, Np = FLAGS.Nm, FLAGS.Np
@@ -124,7 +121,7 @@ def run(argv):
     data = (tf.constant(t[:, None], dtype=gp_dtype),
             tf.constant(y[:, None], dtype=gp_dtype))
 
-    t_pred = np.linspace(0, 4, Np).reshape(-1, 1)
+    t_pred = np.linspace(0, 4, Np, dtype=gp_dtype).reshape(-1, 1)
     ft_pred = sinu(t_pred)
 
     # Prepare cov
@@ -138,28 +135,28 @@ def run(argv):
                        order=FLAGS.rbf_order, balancing_iter=FLAGS.rbf_balance_iter)
     else:
         raise ValueError('Covariance function not found')
-    cov_func.lengthscales.prior = Normal(f64(0.5), f64(2.))
-    cov_func.variance.prior = Normal(f64(1.), f64(2.))
+    cov_func.lengthscales.prior = Normal(gpfloat(0.5), gpfloat(2.))
+    cov_func.variance.prior = Normal(gpfloat(1.), gpfloat(2.))
 
     if model_name == ModelEnum.GP:
         model = gpf.models.GPR(data=data,
                                kernel=cov_func,
                                noise_variance=1.,
                                mean_function=None)
-        model.likelihood.variance.prior = Normal(f64(0.5), f64(1.))
+        model.likelihood.variance.prior = Normal(gpfloat(0.5), gpfloat(1.))
     elif model_name == ModelEnum.SSGP:
         model = StateSpaceGP(data=data,
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=False)
-        model.noise_variance.prior = Normal(f64(0.5), f64(1.))
+        model.noise_variance.prior = Normal(gpfloat(0.5), gpfloat(1.))
     elif model_name == ModelEnum.PSSGP:
         model = StateSpaceGP(data=data,
                              kernel=cov_func,
                              noise_variance=1.,
                              parallel=True,
                              max_parallel=Nm + Np)
-        model.noise_variance.prior = Normal(f64(0.5), f64(1.))
+        model.noise_variance.prior = Normal(gpfloat(0.5), gpfloat(1.))
     else:
         raise ValueError('Model {} not found.'.format(FLAGS.model))
 

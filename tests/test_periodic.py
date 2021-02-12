@@ -5,7 +5,7 @@ import numpy.testing as npt
 import tensorflow as tf
 
 from gpflow.kernels import SquaredExponential
-from pssgp.kernels import SDEPeriodic
+from pssgp.kernels import Periodic
 from pssgp.toymodels import sinu, obs_noise
 from pssgp.kernels.periodic import _get_offline_coeffs
 
@@ -24,7 +24,7 @@ class PeriodicTest(unittest.TestCase):
 
         periodic_order = 2
         periodic_base_kernel = SquaredExponential(variance=1., lengthscales=0.1)
-        self.cov = SDEPeriodic(periodic_base_kernel, period=1., order=periodic_order)
+        self.cov = Periodic(periodic_base_kernel, period=1., order=periodic_order)
 
     def test_offline_coeffs(self):
         b, K, div_facto_K = _get_offline_coeffs(2)

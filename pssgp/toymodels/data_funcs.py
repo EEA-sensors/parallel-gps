@@ -1,6 +1,8 @@
 """
 Some toy models based on deterministic test functions
 """
+import math
+
 import numpy as np
 
 
@@ -70,13 +72,25 @@ def rect(t: np.ndarray) -> np.ndarray:
 
 
 def obs_noise(x: np.ndarray,
-              r: float) -> np.ndarray:
+              r: float,
+              seed: int) -> np.ndarray:
     """
-    Observe data x with Gaussian noises. 
+    Observe data x with Gaussian noises.
     y = x + r,   r ~ N(0, R)
-    
-    Args:
-        x: (n, )
-        R: (n, n)
+
+    Parameters
+    ----------
+    x: np.ndarray (n, )
+        The input
+    r: float
+        The noise variance
+    seed
+
+    Returns
+    -------
+    out: np.ndarray
+        Noisified observations
     """
-    return x + np.sqrt(r) * np.random.randn(x.shape[0])
+    rng = np.random.RandomState(seed)
+    dtype = x.dtype
+    return x + np.sqrt(r) * rng.normal(x, math.sqrt(r), (x.shape[0],)).astype(dtype)

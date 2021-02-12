@@ -25,7 +25,9 @@ def _get_offline_coeffs(N) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     Returns
     -------
-    np.ndarray, np.ndarray, np.ndarray
+    b: np.ndarray
+    K: np.ndarray
+    div_facto_K: np.ndarray
 
     See Also
     --------
@@ -35,14 +37,13 @@ def _get_offline_coeffs(N) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     r = np.arange(0, N + 1)
     J, K = np.meshgrid(r, r)
     div_facto_K = 1 / factorial(K)
-
     # Get b(K, J)
     b = 2 * comb(K, np.floor((K - J) / 2) * (J <= K)) / \
         (1 + (J == 0)) * (J <= K) * (np.mod(K - J, 2) == 0)
     return b, K, div_facto_K
 
 
-class SDEPeriodic(SDEKernelMixin, gpflow.kernels.Periodic):
+class Periodic(SDEKernelMixin, gpflow.kernels.Periodic):
     __doc__ = gpflow.kernels.Periodic.__doc__
 
     def __init__(self, base_kernel: SquaredExponential, period: Union[float, List[float]] = 1.0, **kwargs):

@@ -122,7 +122,7 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
         dtype = P0.dtype
         m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
 
-        max_num_levels = math.ceil(math.log2(max_parallel)) - 1
+        max_num_levels = math.ceil(math.log2(max_parallel))
         initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
         final_elements = scan_associative(filtering_operator,
@@ -182,7 +182,7 @@ def smoothing_operator(elems):
 
 
 def pks(lgssm, ms, Ps, max_parallel=10000):
-    max_num_levels = math.ceil(math.log2(max_parallel)) - 1
+    max_num_levels = math.ceil(math.log2(max_parallel))
     _, Fs, Qs, *_ = lgssm
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)

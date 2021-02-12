@@ -12,7 +12,7 @@ from gpflow.utilities import print_summary
 from tensorflow_probability.python.distributions import Normal
 from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer
 
-from pssgp.kernels import SDEPeriodic
+from pssgp.kernels import Periodic
 from pssgp.kernels.matern import Matern32
 from pssgp.model import StateSpaceGP
 
@@ -138,8 +138,8 @@ def _make_cov():
     periodic_base_cov.variance.prior = Normal(5., 10.)
     periodic_base_cov.variance.prior_on = PriorOn.UNCONSTRAINED
 
-    periodic_cov = SDEPeriodic(periodic_base_cov,
-                               period=1., order=FLAGS.periodic_order)
+    periodic_cov = Periodic(periodic_base_cov,
+                            period=1., order=FLAGS.periodic_order)
 
     periodic_cov.period.prior = Normal(1., 5.)
     periodic_cov.period.prior_on = PriorOn.UNCONSTRAINED
