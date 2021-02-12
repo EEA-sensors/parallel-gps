@@ -4,7 +4,7 @@ import numpy as np
 from absl import flags
 from gpflow import default_float
 
-from experiments.common import ModelEnum, CovarianceEnum
+from pssgp.experiments.common import ModelEnum, CovarianceEnum
 from pssgp.toymodels import sinu, comp_sinu, rect, obs_noise
 
 

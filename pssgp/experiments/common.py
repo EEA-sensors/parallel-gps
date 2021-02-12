@@ -15,9 +15,9 @@ class ModelEnum(enum.Enum):
 
 
 class CovarianceEnum(enum.Enum):
-    Matern12 = 'Matern32'
+    Matern12 = 'Matern12'
     Matern32 = 'Matern32'
-    Matern52 = 'Matern32'
+    Matern52 = 'Matern52'
     RBF = "RBF"
     QP = "QP"
 

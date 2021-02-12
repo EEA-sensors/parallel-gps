@@ -13,8 +13,8 @@ from absl import app, flags
 from gpflow.models.util import data_input_to_tensor
 from scipy.stats.kde import gaussian_kde
 
-from experiments.common import ModelEnum, CovarianceEnum, get_covariance_function, get_model
-from experiments.toy_models.common import FLAGS, get_data
+from pssgp.experiments.common import ModelEnum, CovarianceEnum, get_covariance_function, get_model
+from pssgp.experiments.toy_models.common import FLAGS, get_data
 from pssgp.misc_utils import rmse
 
 flags.DEFINE_integer('n_seeds', 25, "Seed for numpy random generator")
@@ -58,13 +58,11 @@ def ridgeline(ax, data, overlap=0, fill=True, fill_color="b", n_points=150):
             ax.fill_between(xx, np.ones(n_points) * y,
                             curve + y, zorder=len(data) - i + 1, color=fill_color, alpha=0.5)
         ax.plot(xx, curve + y, zorder=len(data) - i + 1, color=fill_color)
-    # if labels:
-    #     ax.yticks(ys, labels)
 
 
-def run(_):
-    f_stability = os.path.join("./results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
-    f_time = os.path.join("./results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
+def run():
+    f_stability = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
+    f_time = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
 
     if FLAGS.run:
         gpf.config.set_default_float(getattr(np, FLAGS.dtype))
@@ -75,10 +73,12 @@ def run(_):
         times = np.empty((FLAGS.mesh_size, FLAGS.mesh_size, FLAGS.n_seeds), dtype=float)
         n_training_logspace = n_test_logspace = np.logspace(7, 14, FLAGS.mesh_size, base=2, dtype=int)
 
-        for (i, n_training), (j, n_pred) in product(enumerate(n_training_logspace),
-                                                    enumerate(n_test_logspace)):
+        for (i, n_training), (j, n_pred) in tqdm.tqdm(product(enumerate(n_training_logspace),
+                                                              enumerate(n_test_logspace)),
+                                                      total=FLAGS.mesh_size ** 2,
+                                                      desc=FLAGS.model):
             model = None
-            for seed in tqdm.trange(FLAGS.n_seeds):
+            for seed in range(FLAGS.n_seeds):
                 try:
                     tic = time.time()
                     error, model = run_one(seed, cov_fun, model, n_training, n_pred)
@@ -102,7 +102,12 @@ def run(_):
         fig.show()
 
 
+def main(_):
+    with tf.device(FLAGS.device):
+        run()
+
+
 if __name__ == '__main__':
     if not os.path.exists("results"):
         os.makedirs('results')
-    app.run(run)
+    app.run(main)
