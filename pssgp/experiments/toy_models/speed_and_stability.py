@@ -17,7 +17,7 @@ from pssgp.experiments.common import ModelEnum, CovarianceEnum, get_covariance_f
 from pssgp.experiments.toy_models.common import FLAGS, get_data
 from pssgp.misc_utils import rmse
 
-flags.DEFINE_integer('n_seeds', 25, "Seed for numpy random generator")
+flags.DEFINE_integer('n_seeds', 21, "Seed for numpy random generator")
 flags.DEFINE_integer('mesh_size', 10, "Size of the mesh for prediction")
 flags.DEFINE_boolean('plot', False, "Plot the result")
 flags.DEFINE_boolean('run', True, "Run the result or load the data")
@@ -78,7 +78,7 @@ def run():
                                                       total=FLAGS.mesh_size ** 2,
                                                       desc=FLAGS.model):
             model = None
-            for seed in range(FLAGS.n_seeds):
+            for seed in tqdm.trange(FLAGS.n_seeds, leave=False):
                 try:
                     tic = time.time()
                     error, model = run_one(seed, cov_fun, model, n_training, n_pred)
@@ -86,9 +86,11 @@ def run():
                     # the only reason we return the model is so that we don't have to recompile everytime
                     errors[i, j, seed] = error
                     times[i, j, seed] = toc - tic
-                except MemoryError:
+                except Exception as e:  # noqa: It's not clear what the error returned by TF could be, so well...
                     errors[i, j, seed] = float("nan")
                     times[i, j, seed] = float("nan")
+                    print(
+                        f"{FLAGS.model}-{FLAGS.cov} failed with n_training,n_pred={n_training, n_pred} and error: \n {e}")
 
         np.save(f_stability, errors)
         np.save(f_time, times)
@@ -103,7 +105,8 @@ def run():
 
 
 def main(_):
-    with tf.device(FLAGS.device):
+    device = tf.device(FLAGS.device)
+    with device:
         run()
 
 

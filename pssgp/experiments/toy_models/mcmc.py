@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 import tqdm
 from absl import app, flags
+from gpflow import config
 from gpflow.base import PriorOn
 from gpflow.models import GPModel
 from tensorflow_probability.python.distributions import Normal
@@ -18,11 +19,11 @@ from pssgp.experiments.toy_models.common import FLAGS, get_data
 
 flags.DEFINE_integer('np_seed', 42, "data model seed")
 flags.DEFINE_integer('tf_seed', 31415, "mcmc model seed")
-flags.DEFINE_integer('n_runs', 1, "size of the logspace for n training samples")
-flags.DEFINE_integer('n_samples', 100, "Number of samples required")
-flags.DEFINE_integer('n_burnin', 50, "Number of burnin samples")
+flags.DEFINE_integer('n_runs', 10, "size of the logspace for n training samples")
+flags.DEFINE_integer('n_samples', 1000, "Number of samples required")
+flags.DEFINE_integer('n_burnin', 100, "Number of burnin samples")
 flags.DEFINE_string('mcmc', MCMC.HMC.value, "Which MCMC algo")
-flags.DEFINE_float('step_size', 0.1, "Step size for the gradient based chain")
+flags.DEFINE_float('step_size', 0.05, "Step size for the gradient based chain")
 flags.DEFINE_float('n_leapfrogs', 10, "Num leapfrogs for HMC")
 
 flags.DEFINE_boolean('plot', False, "Plot the result")
@@ -31,7 +32,7 @@ flags.DEFINE_boolean('run', True, "Run the result or load the data")
 
 def set_priors(gp_model: GPModel):
     to_dtype = gpf.utilities.to_default_float
-    if FLAGS.model == ModelEnum.GP:
+    if FLAGS.model == ModelEnum.GP.value:
         gp_model.likelihood.variance.prior = Normal(to_dtype(0.1), to_dtype(1.))
         gp_model.likelihood.variance.prior_on = PriorOn.UNCONSTRAINED
     else:
@@ -59,13 +60,19 @@ def run_one(n_training):
                          t.shape[0])
     gp_model = set_priors(gp_model)
     mcmc_helper, run_chain_fn = get_run_chain_fn(gp_model, num_samples, num_burnin_steps)
-    tic = time.time()
-    result, all_traces = run_chain_fn()
-    toc = time.time()
+    try:
+        tic = time.time()
+        result, all_traces = run_chain_fn()
+        run_time = time.time() - tic
+        parameter_samples = mcmc_helper.convert_to_constrained_values(result)
 
-    parameter_samples = mcmc_helper.convert_to_constrained_values(result)
+    except Exception as e:  # noqa: It's not clear what the error returned by TF could be, so well...
+        run_time = float("nan")
+        parameter_samples = [np.nan * np.ones((num_samples,), dtype=config.default_float()) for _ in
+                             gp_model.trainable_parameters]
+        print(f"{FLAGS.model}-{FLAGS.cov} failed with n_training={n_training} and error: \n {e}")
 
-    return toc - tic, dict(zip(gpf.utilities.parameter_dict(gp_model), parameter_samples))
+    return run_time, dict(zip(gpf.utilities.parameter_dict(gp_model), parameter_samples))
 
 
 def run():
@@ -88,7 +95,8 @@ def run():
 
 
 def main(_):
-    with tf.device(FLAGS.device):
+    device = tf.device(FLAGS.device)
+    with device:
         run()
 
 

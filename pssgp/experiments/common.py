@@ -63,13 +63,6 @@ def get_model(model_enum, data, noise_variance, covariance_function, max_paralle
         gp_model = StateSpaceGP(data, covariance_function, noise_variance, parallel=True, max_parallel=max_parallel)
     else:
         raise ValueError("model not supported")
-    # Do a quick compilation run
-    tic = time.time()
-    with tf.GradientTape() as tape:
-        val = gp_model.maximum_log_likelihood_objective()
-    _ = tape.gradient(val, gp_model.trainable_variables)
-    print(f">>>>>>> {model_enum} compiled in {time.time() - tic}")
-
     return gp_model
 
 
@@ -96,7 +89,7 @@ def get_run_chain_fn(gp_model, num_samples, num_burnin_steps):
     else:
         raise ValueError(f"mcmc must be a {MCMC} enum, {FLAGS.mcmc} was passed")
     pbar = ProgressBarReducer(num_samples + num_burnin_steps,
-                              make_tqdm_progress_bar_fn(f"{FLAGS.model}-{FLAGS.mcmc}", False))
+                              make_tqdm_progress_bar_fn(f"{FLAGS.model}-{FLAGS.mcmc}", True))
     pbar.initialize(None)
 
     mcmc = WithReductions(mcmc, pbar)
