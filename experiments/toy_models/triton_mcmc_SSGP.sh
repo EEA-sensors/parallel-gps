@@ -2,8 +2,6 @@
 
 # Run this script after the environment has been setup by `triton_setup.sh`
 
-#SBATCH -c 6
-#SBATCH --mem=64G
 #SBATCH -o logs/mcmc_ssgp.log
 
 cd $WRKDIR/parallel-gps/experiments/toy_models

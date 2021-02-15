@@ -4,7 +4,6 @@
 
 #SBATCH -c 4
 #SBATCH --mem=8G
-#SBATCH --gres=gpu:v100:1
 #SBATCH -o logs/mcmc_pssgp.log
 
 cd $WRKDIR/parallel-gps/experiments/toy_models
