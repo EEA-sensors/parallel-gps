@@ -1,10 +1,11 @@
-#!/bin/bash parallel-gps
+#!/bin/bash
 
 # Run this script after the environment has been setup by `triton_setup.sh`
 
 #SBATCH -c 4
 #SBATCH --mem=8G
 #SBATCH --gres=gpu:v100:1
+#SBATCH -o logs/mcmc_gp.log
 
 cd $WRKDIR/parallel-gps/experiments/toy_models
 

@@ -1,4 +1,4 @@
-#!/bin/bash parallel-gps
+#!/bin/bash
 
 step_size=0.01
 n_runs=10
