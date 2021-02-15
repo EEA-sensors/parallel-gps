@@ -62,7 +62,7 @@ def ridgeline(ax, data, overlap=0, fill=True, fill_color="b", n_points=150):
 
 def run():
     f_stability = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
-    f_time = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
+    f_time = os.path.join("results", f"time-matrix-{FLAGS.cov}-{FLAGS.model}")
 
     if FLAGS.run:
         gpf.config.set_default_float(getattr(np, FLAGS.dtype))
