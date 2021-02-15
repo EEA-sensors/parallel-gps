@@ -12,8 +12,6 @@ then
     mkdir ./results
 fi
 
-module load cuda
-module load cudnn
 module load anaconda/2020-05-tf2
 
 conda activate $WRKDIR/zz-env
