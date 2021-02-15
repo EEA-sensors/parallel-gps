@@ -70,7 +70,7 @@ def run():
         cov_fun = get_covariance_function(cov_name)
         errors = np.empty((FLAGS.mesh_size, FLAGS.mesh_size, FLAGS.n_seeds), dtype=float)
         times = np.empty((FLAGS.mesh_size, FLAGS.mesh_size, FLAGS.n_seeds), dtype=float)
-        n_training_logspace = n_test_logspace = np.logspace(9, 15, FLAGS.mesh_size, base=2, dtype=int)
+        n_training_logspace = n_test_logspace = np.logspace(12, 15, FLAGS.mesh_size, base=2, dtype=int)
 
         for (i, n_training), (j, n_pred) in tqdm.tqdm(product(enumerate(n_training_logspace),
                                                               enumerate(n_test_logspace)),
