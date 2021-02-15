@@ -14,6 +14,8 @@ fi
 
 module load anaconda/2020-05-tf2
 
+CONDA_BASE=$(conda info --base) ; source $CONDA_BASE/etc/profile.d/conda.sh
+
 conda activate $WRKDIR/zz-env
 
 py_script=pssgp.experiments.toy_models.mcmc
