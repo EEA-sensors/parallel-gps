@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#SBATCH -c 4
+#SBATCH --time=01-10
+#SBATCH --mem=32G
+
 cd $WRKDIR/parallel-gps/experiments/toy_models
 
 if [ ! -d "./results" ]
