@@ -81,7 +81,7 @@ def get_run_chain_fn(gp_model, num_samples, num_burnin_steps):
             target_log_prob_fn=mcmc_helper.target_log_prob_fn,
             step_size=FLAGS.step_size
         )
-    elif FLAGS.mcmc == MCMC.MALA.value:
+    elif FLAGS.mcmc == MCMC.NUTS.value:
         mcmc = NoUTurnSampler(
             target_log_prob_fn=mcmc_helper.target_log_prob_fn,
             step_size=FLAGS.step_size
