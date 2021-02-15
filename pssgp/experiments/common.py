@@ -50,7 +50,7 @@ def get_covariance_function(covariance_enum, **kwargs):
     if covariance_enum == CovarianceEnum.RBF:
         return RBF(**kwargs)
     if covariance_enum == CovarianceEnum.QP:
-        base_kernel = SquaredExponential(kwargs.pop("variance"), kwargs.pop("lengthscales"))
+        base_kernel = SquaredExponential(kwargs.pop("variance", 1.), kwargs.pop("lengthscales", 1.))
         return Periodic(base_kernel, **kwargs)
 
 

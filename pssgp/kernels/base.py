@@ -46,7 +46,7 @@ def _get_ssm(sde, ts, R, t0=0.):
 
 
 class SDEKernelMixin(metaclass=abc.ABCMeta):
-    def __init__(self, t0: float = 0.):
+    def __init__(self, t0: float = 0., **_kwargs):
         """
 
         Parameters:
