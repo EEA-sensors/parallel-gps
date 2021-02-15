@@ -2,9 +2,7 @@ This folder contains python scripts for experiments.
 
 The following files are,
 
-1. `./sinu_map.py`: GP, Sparse GP, SSGP, and PSSGP on sinusoidal toy model. Use MAP to learn hyperparameters.
-
-2. `./sinu_hmc.py`: Same as above, while use Hamiltonian Monte Carlo to learn hyperparameters.
+1. `./sinusoidal_regression.py`: GP regression on a sinusoidal signal.
 
 3. `./co2_map.py`: Mauna Loa loa co2 using PSSGP. Hyperparameters are learnt by MAP.
 
