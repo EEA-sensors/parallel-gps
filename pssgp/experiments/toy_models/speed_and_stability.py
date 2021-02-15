@@ -62,16 +62,15 @@ def ridgeline(ax, data, overlap=0, fill=True, fill_color="b", n_points=150):
 
 def run():
     f_stability = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
-    f_time = os.path.join("results", f"stability-matrix-{FLAGS.cov}-{FLAGS.model}")
+    f_time = os.path.join("results", f"time-matrix-{FLAGS.cov}-{FLAGS.model}")
 
     if FLAGS.run:
         gpf.config.set_default_float(getattr(np, FLAGS.dtype))
         cov_name = CovarianceEnum(FLAGS.cov)
-
         cov_fun = get_covariance_function(cov_name)
         errors = np.empty((FLAGS.mesh_size, FLAGS.mesh_size, FLAGS.n_seeds), dtype=float)
         times = np.empty((FLAGS.mesh_size, FLAGS.mesh_size, FLAGS.n_seeds), dtype=float)
-        n_training_logspace = n_test_logspace = np.logspace(7, 14, FLAGS.mesh_size, base=2, dtype=int)
+        n_training_logspace = n_test_logspace = np.logspace(9, 15, FLAGS.mesh_size, base=2, dtype=int)
 
         for (i, n_training), (j, n_pred) in tqdm.tqdm(product(enumerate(n_training_logspace),
                                                               enumerate(n_test_logspace)),
