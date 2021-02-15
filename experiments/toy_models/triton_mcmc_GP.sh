@@ -4,7 +4,6 @@
 
 #SBATCH -c 4
 #SBATCH --mem=8G
-#SBATCH --time=05:00:00
 #SBATCH --gres=gpu:v100:1
 
 cd $WRKDIR/parallel-gps/experiments/toy_models

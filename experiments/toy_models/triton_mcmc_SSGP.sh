@@ -4,7 +4,6 @@
 
 #SBATCH -c 6
 #SBATCH --mem=64G
-#SBATCH --time=02-10
 
 cd $WRKDIR/parallel-gps/experiments/toy_models
 
