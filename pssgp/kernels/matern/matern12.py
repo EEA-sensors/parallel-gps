@@ -9,7 +9,6 @@ class Matern12(SDEKernelMixin, gpflow.kernels.Matern12):
     __doc__ = gpflow.kernels.Matern12.__doc__
 
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
-        self._order = kwargs.pop('order', 3)
         gpflow.kernels.Matern12.__init__(self, variance, lengthscales, **kwargs)
         SDEKernelMixin.__init__(self, **kwargs)
 

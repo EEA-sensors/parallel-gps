@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
-from pssgp.math_utils import solve_lyap_vec
+from pssgp.kernels.math_utils import balance_ss, solve_lyap_vec
 
 
 def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
@@ -66,82 +66,6 @@ def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
     return F, L, H, q
 
 
-@partial(nb.jit, nopython=True)
-def nb_balance_ss(F: np.ndarray,
-                  iter: int) -> np.ndarray:
-    dim = F.shape[0]
-    dtype = F.dtype
-    d = np.ones((dim,), dtype=dtype)
-    for k in range(iter):
-        for i in range(dim):
-            tmp = np.copy(F[:, i])
-            tmp[i] = 0.
-            c = np.linalg.norm(tmp, 2)
-            tmp2 = np.copy(F[i, :])
-            tmp2[i] = 0.
-
-            r = np.linalg.norm(tmp2, 2)
-            f = np.sqrt(r / c)
-            d[i] *= f
-            F[:, i] *= f
-            F[i, :] /= f
-    return d
-
-
-def _balance_ss(F: tf.Tensor,
-                L: tf.Tensor,
-                H: tf.Tensor,
-                q: tf.Tensor,
-                iter: int = 5) -> Tuple[tf.Tensor, ...]:
-    """Balance state-space model to have better numerical stability
-
-    Parameters
-    ----------
-    F : tf.Tensor
-        Matrix
-    L : tf.Tensor
-        Matrix
-    H : tf.Tensor
-        Measurement matrix
-    q : tf.Tensor
-        Spectral dnesity
-    iter : int
-        Iteration of balancing
-
-    Returns
-    -------
-    F : tf.Tensor
-        ...
-    L : tf.Tensor
-        ...
-    H : tf.Tensor
-        ...
-    q : tf.Tensor
-        ...
-
-
-    References
-    ----------
-    https://arxiv.org/pdf/1401.5766.pdf
-    """
-    dtype = config.default_float()
-    d = tf.numpy_function(partial(nb_balance_ss, iter=iter), (F,), dtype)
-    d = tf.reshape(d, (tf.shape(F)[0],))  # This is to make sure that the shape of d is known at compilation time.
-    F = F * d[None, :] / d[:, None]
-    L = L / d[:, None]
-    H = H * d[None, :]
-
-    tmp3 = tf.reduce_max(tf.abs(L))
-    L = L / tmp3
-    q = (tmp3 ** 2) * q
-
-    tmp4 = tf.reduce_max(tf.abs(H))
-    H = H / tmp4
-    q = (tmp4 ** 2) * q
-
-    return F, L, H, q
-
-
 class RBF(SDEKernelMixin, gpflow.kernels.RBF):
     __doc__ = gpflow.kernels.RBF.__doc__
 
@@ -174,7 +98,7 @@ class RBF(SDEKernelMixin, gpflow.kernels.RBF):
         H = H / (self.lengthscales ** dim)
         q = self.variance * self.lengthscales * q
 
-        Fb, Lb, Hb, qb = _balance_ss(F, L, H, q, self._balancing_iter)
+        Fb, Lb, Hb, qb, _ = balance_ss(F, L, H, q, n_iter=self._balancing_iter)
 
         Pinf = solve_lyap_vec(Fb, Lb, qb)
 
