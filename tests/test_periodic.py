@@ -13,12 +13,12 @@ from pssgp.kernels.periodic import _get_offline_coeffs
 class PeriodicTest(unittest.TestCase):
 
     def setUp(self):
-        np.random.seed(31415926)
+        seed = 31415926
         self.T = 2000
         self.K = 800
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
-        self.y = obs_noise(self.ft, 0.01)
+        self.y = obs_noise(self.ft, 0.01, seed)
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 

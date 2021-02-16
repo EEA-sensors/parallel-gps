@@ -18,11 +18,11 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
         y, F, Q = inp
         mp = mv(F, m)
         Pp = F @ mm(P, F, transpose_b=True) + Q
+        Pp = 0.5 * (Pp + tf.transpose(Pp))
 
         def update(m, P, ell):
             S = H @ mm(P, H, transpose_b=True) + R
             yp = mv(H, m)
-
             chol = tf.linalg.cholesky(S)
             predicted_dist = MultivariateNormalTriL(yp, chol)
             ell_t = predicted_dist.log_prob(y)
@@ -36,6 +36,7 @@ def kf(lgssm, observations, return_loglikelihood=False, return_predicted=False):
         nan_y = ~tf.math.is_nan(y)
         nan_res = (ell, mp, Pp)
         ell, m, P = tf.cond(nan_y, lambda: update(mp, Pp, ell), lambda: nan_res)
+        P = 0.5 * (P + tf.transpose(P))
         return ell, m, P, mp, Pp
 
     ells, fms, fPs, mps, Pps = tf.scan(body,
@@ -57,7 +58,7 @@ def ks(lgssm, ms, Ps, mps, Pps):
         Ct = tf.linalg.cholesky_solve(chol, F @ P)
         sm = m + mv(Ct, sm - mp, transpose_a=True)
         sP = P + mm(Ct, sP - Pp, transpose_a=True) @ Ct
-        return sm, sP
+        return sm, 0.5 * (sP + tf.transpose(sP))
 
     (sms, sPs) = tf.scan(body,
                          (Fs[1:], Qs[1:], ms[:-1], Ps[:-1], mps[1:], Pps[1:]),

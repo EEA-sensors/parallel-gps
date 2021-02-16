@@ -33,7 +33,6 @@ def balance_ss(F: tf.Tensor,
                L: tf.Tensor,
                H: tf.Tensor,
                q: tf.Tensor,
-               P: Optional[tf.Tensor] = None,
                n_iter: int = 5) -> Tuple[tf.Tensor, ...]:
     """Balance state-space model to have better numerical stability
 
@@ -83,9 +82,7 @@ def balance_ss(F: tf.Tensor,
     tmp4 = tf.reduce_max(tf.abs(H))
     H = H / tmp4
     q = (tmp4 ** 2) * q
-    if P is not None:
-        P = P * d[None, :] / d[:, None]
-    return F, L, H, q, d, P
+    return F, L, H, q
 
 
 def solve_lyap_vec(F: tf.Tensor,

@@ -113,6 +113,8 @@ def filtering_operator(elem1, elem2):
     eta = mv(temp, eta2 - mv(J2, b1), transpose_a=True) + eta1
     J = mm(temp, J2 @ A1, transpose_a=True) + J1
 
+    C = 0.5 * (C + tf.transpose(C, [0, 2, 1]))
+    J = 0.5 * (J + tf.transpose(J, [0, 2, 1]))
     return A, b, C, J, eta
 
 
@@ -154,23 +156,21 @@ def last_smoothing_element(m, P):
 def generic_smoothing_element(F, Q, m, P):
     Pp = F @ mm(P, F, transpose_b=True) + Q
     chol = tf.linalg.cholesky(Pp)
-    E = tf.transpose(tf.linalg.cholesky_solve(chol, F @ P))
+    E = tf.transpose(tf.linalg.cholesky_solve(chol, F @ P), [0, 2, 1])
     g = m - mv(E @ F, m)
     L = P - E @ mm(Pp, E, transpose_b=True)
+    L = 0.5 * (L + tf.transpose(L, [0, 2, 1]))
     return E, g, L
 
 
 def make_associative_smoothing_elements(Fs, Qs, filtering_means, filtering_covariances):
     last_elems = last_smoothing_element(filtering_means[-1], filtering_covariances[-1])
-    generic_elems = tf.vectorized_map(lambda z: generic_smoothing_element(*z),
-                                      (Fs[1:], Qs[1:], filtering_means[:-1], filtering_covariances[:-1]),
-                                      fallback_to_while_loop=False)
+    generic_elems = generic_smoothing_element(Fs[1:], Qs[1:], filtering_means[:-1], filtering_covariances[:-1])
     return tuple(tf.concat([gen_es, tf.expand_dims(last_e, 0)], axis=0)
                  for gen_es, last_e in zip(generic_elems, last_elems))
 
 
-def smoothing_operator(elems):
-    elem1, elem2 = elems
+def smoothing_operator(elem1, elem2):
     E1, g1, L1 = elem1
     E2, g2, L2 = elem2
 
@@ -187,10 +187,7 @@ def pks(lgssm, ms, Ps, max_parallel=10000):
     initial_elements = make_associative_smoothing_elements(Fs, Qs, ms, Ps)
     reversed_elements = tuple(tf.reverse(elem, axis=[0]) for elem in initial_elements)
 
-    def vectorized_operator(a, b):
-        return tf.vectorized_map(smoothing_operator, (a, b), fallback_to_while_loop=False)
-
-    final_elements = scan_associative(vectorized_operator,
+    final_elements = scan_associative(smoothing_operator,
                                       reversed_elements,
                                       max_num_levels=max_num_levels)
     return tf.reverse(final_elements[1], axis=[0]), tf.reverse(final_elements[2], axis=[0])

@@ -98,7 +98,7 @@ class RBF(SDEKernelMixin, gpflow.kernels.RBF):
         H = H / (self.lengthscales ** dim)
         q = self.variance * self.lengthscales * q
 
-        Fb, Lb, Hb, qb, _ = balance_ss(F, L, H, q, n_iter=self._balancing_iter)
+        Fb, Lb, Hb, qb= balance_ss(F, L, H, q, n_iter=self._balancing_iter)
 
         Pinf = solve_lyap_vec(Fb, Lb, qb)
 

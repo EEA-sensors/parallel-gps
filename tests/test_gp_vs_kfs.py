@@ -29,7 +29,7 @@ class GPEquivalenceTest(unittest.TestCase):
         self.K = 50
         self.t = np.sort(np.random.rand(self.T))
         self.ft = sinu(self.t)
-        self.y = obs_noise(self.ft, 0.1)
+        self.y = obs_noise(self.ft, 0.1, None)
         periodic_base = SquaredExponential(variance=1., lengthscales=0.5)
         self.covs = (
             (Matern12(variance=1., lengthscales=0.5), 1e-6, 1e-2),

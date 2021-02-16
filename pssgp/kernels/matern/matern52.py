@@ -5,14 +5,14 @@ import tensorflow as tf
 
 from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
 from pssgp.kernels.matern.common import get_matern_sde
-from pssgp.kernels.math_utils import balance_ss
+from pssgp.kernels.math_utils import balance_ss, solve_lyap_vec
 
 
 class Matern52(SDEKernelMixin, gpflow.kernels.Matern52):
     __doc__ = gpflow.kernels.Matern52.__doc__
 
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
-        self._balancing_iter = kwargs.pop('balancing_iter', 3)
+        self._balancing_iter = kwargs.pop('balancing_iter', 5)
         gpflow.kernels.Matern52.__init__(self, variance, lengthscales, **kwargs)
         SDEKernelMixin.__init__(self, **kwargs)
 
@@ -25,10 +25,10 @@ class Matern52(SDEKernelMixin, gpflow.kernels.Matern52):
         lamda = math.sqrt(5) / lengthscales
         variance = tf.reduce_sum(self.variance)
 
-        temp = lamda ** 2 * variance
-        P_infty = tf.linalg.diag([variance, temp / 3, temp ** 2])
-        P_infty = tf.tensor_scatter_nd_sub(P_infty, [[0, 2], [2, 0]], [temp / 3, temp / 3])
-
-        Fb, Lb, Hb, qb, Pb = balance_ss(F, L, H, q, P=P_infty, n_iter=self._balancing_iter)
-
-        return ContinuousDiscreteModel(Pb, Fb, Lb, Hb, qb)
+        # temp = lamda ** 2 * variance
+        # P_infty = tf.linalg.diag([variance, temp / 3, temp ** 2])
+        # P_infty = tf.tensor_scatter_nd_sub(P_infty, [[0, 2], [2, 0]], [temp / 3, temp / 3])
+        # tf.print(P_infty)
+        Fb, Lb, Hb, qb = balance_ss(F, L, H, q, n_iter=self._balancing_iter)
+        Pinf = solve_lyap_vec(Fb, Lb, qb)
+        return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, qb)
