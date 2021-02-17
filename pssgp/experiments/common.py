@@ -1,10 +1,11 @@
 import enum
 import time
-
+import numpy as np
 import gpflow as gpf
 import tensorflow as tf
 from absl import flags
 from absl.flags import FLAGS
+from gpflow import config
 from gpflow.kernels import SquaredExponential
 from gpflow.models import GPR
 from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer, WithReductions, \
@@ -40,7 +41,7 @@ class CovarianceEnum(enum.Enum):
 flags.DEFINE_string("device", "/cpu:0", "Device on which to run")
 
 
-def get_covariance_function(covariance_enum, **kwargs):
+def get_simple_covariance_function(covariance_enum, **kwargs):
     if covariance_enum == CovarianceEnum.Matern12:
         return Matern12(**kwargs)
     if covariance_enum == CovarianceEnum.Matern32:
@@ -64,6 +65,26 @@ def get_model(model_enum, data, noise_variance, covariance_function, max_paralle
     else:
         raise ValueError("model not supported")
     return gp_model
+
+
+def run_one_mcmc(n_training, gp_model):
+    num_burnin_steps = FLAGS.n_burnin
+    num_samples = FLAGS.n_samples
+
+    mcmc_helper, run_chain_fn = get_run_chain_fn(gp_model, num_samples, num_burnin_steps)
+    try:
+        tic = time.time()
+        result, all_traces = run_chain_fn()
+        run_time = time.time() - tic
+        parameter_samples = mcmc_helper.convert_to_constrained_values(result)
+
+    except Exception as e:  # noqa: It's not clear what the error returned by TF could be, so well...
+        run_time = float("nan")
+        parameter_samples = [np.nan * np.ones((num_samples,), dtype=config.default_float()) for _ in
+                             gp_model.trainable_parameters]
+        print(f"{FLAGS.model}-{FLAGS.cov} failed with n_training={n_training} and error: \n {e}")
+
+    return run_time, dict(zip(gpf.utilities.parameter_dict(gp_model), parameter_samples))
 
 
 def get_run_chain_fn(gp_model, num_samples, num_burnin_steps):

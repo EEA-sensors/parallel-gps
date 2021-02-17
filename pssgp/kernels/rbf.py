@@ -96,11 +96,11 @@ class RBF(SDEKernelMixin, gpflow.kernels.RBF):
         F = tf.tensor_scatter_nd_update(F, update_indices, F[-1, :] / ell_vec)
 
         H = H / (self.lengthscales ** dim)
-        q = self.variance * self.lengthscales * q
+        Q = self.variance * self.lengthscales * tf.reshape(q, (1, 1))
 
-        Fb, Lb, Hb, qb= balance_ss(F, L, H, q, n_iter=self._balancing_iter)
+        Fb, Lb, Hb, Qb = balance_ss(F, L, H, Q, n_iter=self._balancing_iter)
 
-        Pinf = solve_lyap_vec(Fb, Lb, qb)
+        Pinf = solve_lyap_vec(Fb, Lb, Qb)
 
-        Q = tf.reshape(qb, (1, 1))
+        Q = tf.reshape(Qb, (1, 1))
         return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Q)

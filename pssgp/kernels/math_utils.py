@@ -4,7 +4,7 @@ from typing import Tuple, Optional
 import numba as nb
 import numpy as np
 import tensorflow as tf
-from gpflow import config, config as config
+from gpflow import config
 
 
 @partial(nb.jit, nopython=True)
@@ -61,8 +61,6 @@ def balance_ss(F: tf.Tensor,
         ...
     q : tf.Tensor
         ...
-    P: tf.Tensor or None
-        ...
 
     References
     ----------
@@ -87,10 +85,10 @@ def balance_ss(F: tf.Tensor,
 
 def solve_lyap_vec(F: tf.Tensor,
                    L: tf.Tensor,
-                   q: tf.Tensor) -> tf.Tensor:
+                   Q: tf.Tensor) -> tf.Tensor:
     """Vectorized Lyapunov equation solver
 
-    F P + P F' + L q L' = 0
+    F P + P F' + L Q L' = 0
 
     Parameters
     ----------
@@ -98,7 +96,7 @@ def solve_lyap_vec(F: tf.Tensor,
         ...
     L : tf.Tensor
         ...
-    q : tf.Tensor
+    Q : tf.Tensor
         ...
 
     Returns
@@ -117,10 +115,9 @@ def solve_lyap_vec(F: tf.Tensor,
     F1 = tf.linalg.LinearOperatorKronecker([op2, op1]).to_dense()
     F2 = tf.linalg.LinearOperatorKronecker([op1, op2]).to_dense()
 
+
     F = F1 + F2
-
-    Q = L @ tf.transpose(L) * q
-
+    Q = tf.matmul(L, tf.matmul(Q, L, transpose_b=True))
     Pinf = tf.reshape(tf.linalg.solve(F, tf.reshape(Q, (-1, 1))), (dim, dim))
     Pinf = -0.5 * (Pinf + tf.transpose(Pinf))
     return Pinf

@@ -10,7 +10,7 @@ function [Pinf,F,L,H,q,H_se,H_ma,H_qp] = maunaloa_to_ss(se_magnSigma2, se_length
     [Pinf3,F3,L3,H3,q3] = qper_to_ss(qp_magnSigma2, qp_lengthScale, period, ...
                                      mlengthScale, damping);
 
-    Stack
+%     Stack
     F    = blkdiag(F1,F2,F3);
     L    = blkdiag(L1,L2,L3);
     q    = blkdiag(q1,q2,q3);

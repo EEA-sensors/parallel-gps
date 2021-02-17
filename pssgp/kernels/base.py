@@ -9,6 +9,7 @@ from gpflow import config
 from gpflow.kernels import Kernel
 
 from pssgp.kalman.base import LGSSM
+from pssgp.kernels.math_utils import balance_ss, solve_lyap_vec
 
 ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L", "H", "Q"])
 
@@ -168,11 +169,15 @@ class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
             Ls.append(L)
             Hs.append(H)
             Qs.append(Q)
-        return ContinuousDiscreteModel(self._block_diagonal(P0s, is_positive_definite=True),
-                                       self._block_diagonal(Fs),
-                                       self._block_diagonal(Ls, square=False),
-                                       tf.concat(Hs, axis=1),
-                                       self._block_diagonal(Qs, is_positive_definite=True))
+
+        Fsum = self._block_diagonal(Fs)
+        Lsum = self._block_diagonal(Ls, square=False)
+        Hsum = tf.concat(Hs, axis=1)
+        Qsum = self._block_diagonal(Qs, is_positive_definite=True)
+
+        Fb, Lb, Hb, Qb = balance_ss(Fsum, Lsum, Hsum, Qsum)
+        Pinf = solve_lyap_vec(Fb, Lb, Qb)
+        return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Qb)
 
 
 class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
@@ -226,12 +231,11 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
         sdes = [kernel.get_sde() for kernel in kernels]
 
         F = reduce(self._combine_F, [sde.F for sde in sdes])
-        Q = reduce(self._combine_Q, [sde for sde in sdes])
-        P0 = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.P0, is_positive_definite=True,
-                                                                                   is_self_adjoint=True)
-                                                for sde in sdes]).to_dense()
+        Q: tf.Tensor = reduce(self._combine_Q, [sde for sde in sdes])  # noqa: this really returns a Tensor.
         H = tf.linalg.LinearOperatorKronecker([tf.linalg.LinearOperatorFullMatrix(sde.H)
                                                for sde in sdes]).to_dense()
         L = tf.eye(tf.shape(Q)[0], dtype=dtype)
 
-        return ContinuousDiscreteModel(P0, F, L, H, Q)
+        Fb, Lb, Hb, Qb = balance_ss(F, L, H, Q)
+        Pinf = solve_lyap_vec(Fb, Lb, Qb)
+        return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Qb)

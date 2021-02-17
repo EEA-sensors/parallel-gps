@@ -2,6 +2,7 @@
 Some toy models based on deterministic test functions
 """
 import math
+from typing import Optional
 
 import numpy as np
 
@@ -73,7 +74,7 @@ def rect(t: np.ndarray) -> np.ndarray:
 
 def obs_noise(x: np.ndarray,
               r: float,
-              seed: int) -> np.ndarray:
+              seed: Optional[int] = None) -> np.ndarray:
     """
     Observe data x with Gaussian noises.
     y = x + r,   r ~ N(0, R)

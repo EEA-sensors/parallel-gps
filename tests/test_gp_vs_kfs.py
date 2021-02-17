@@ -11,6 +11,7 @@ import tensorflow as tf
 from gpflow.kernels import SquaredExponential
 
 from pssgp.kernels import RBF, Periodic
+from pssgp.kernels.base import SDESum
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
@@ -46,7 +47,6 @@ class GPEquivalenceTest(unittest.TestCase):
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
             print("cov: ", cov)
-
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,

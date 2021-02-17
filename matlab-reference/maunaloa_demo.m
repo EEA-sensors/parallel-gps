@@ -7,8 +7,8 @@
     %
     
     % Load and convert
-    monthly = textread('co2_mm_mlo.txt','','commentstyle','shell');
-    weekly  = textread('co2_weekly_mlo.txt','','commentstyle','shell');
+    monthly = textread('../experiments/co2_mm_mlo.txt','','commentstyle','shell');
+    weekly  = textread('../experiments/co2_weekly_mlo.txt','','commentstyle','shell');
     
     % Fix missing values
     monthly(monthly<-99) = nan;
@@ -33,12 +33,12 @@
     y   = y(ind);
     
     % Only use data prior to 2010, retain newer for validation
-    ind   = t<2010;
+    ind   = t<2014;
     yn    = y(ind);
     ymean = mean(yn);
     yn    = yn-ymean;
     to    = t(ind);
-    xt    = (2010:1/24:2020)';
+    xt    = (2014:1/24:2020)';
     
     % Show
     
@@ -100,6 +100,8 @@
     
     clf;
     h = plot(all_t,ymean + pred_m)
+    hold on
+    errorbar(all_t, ymean +pred_m, 1.96 * sqrt(pred_v));
     set(h,'MarkerSize',3,'LineWidth',0.1);
     
     hold on;
