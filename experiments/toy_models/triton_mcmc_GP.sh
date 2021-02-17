@@ -5,21 +5,11 @@
 #SBATCH --time=06:00:00
 #SBATCH --gres=gpu:v100:1
 
-cd $WRKDIR/parallel-gps/experiments/toy_models
-
-if [ ! -d "./results" ]
-then
-    echo "results history folder not exists, will mkdir"
-    mkdir ./results
-fi
-
-module load cuda
-module load cudnn
-module load anaconda/2020-05-tf2
+cd ~/PycharmProjects/parallel-gps/experiments/toy_models
 
 CONDA_BASE=$(conda info --base) ; source $CONDA_BASE/etc/profile.d/conda.sh
 
-conda activate $WRKDIR/zz-env
+conda activate cd ~/PycharmProjects/parallel-gps/venv
 
 py_script=pssgp.experiments.toy_models.mcmc
 

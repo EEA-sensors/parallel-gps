@@ -53,10 +53,10 @@ def run():
     f_posterior = os.path.join("results", f"mcmc-posterior-{FLAGS.cov}-{FLAGS.model}-{FLAGS.mcmc}")
     if FLAGS.cov == CovarianceEnum.QP.value:
         raise NotImplementedError("Quasiperiodic is not supported for this experiment")
-
-    n_training_logspace = [32, 319, 3192]
+    n_training_logspace = np.logspace(7, 14, FLAGS.n_runs, base=2, dtype=int)
 
     if FLAGS.run:
+        params_res = dict()
         times = np.empty(FLAGS.n_runs, dtype=float)
         cov_fun = get_simple_covariance_function(FLAGS.cov)
         gpf.config.set_default_float(getattr(np, FLAGS.dtype))
