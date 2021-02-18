@@ -82,5 +82,5 @@ class Periodic(SDEKernelMixin, gpflow.kernels.Periodic):
         Pinf = tf_kron([q2, tf.linalg.LinearOperatorIdentity(2, dtype=dtype)]).to_dense()
 
         H = tf_kron([tf.linalg.LinearOperatorFullMatrix(tf.ones((1, N + 1), dtype=dtype)),
-                    tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))]).to_dense()
+                     tf.linalg.LinearOperatorFullMatrix(tf.constant([[1, 0]], dtype=dtype))]).to_dense()
         return ContinuousDiscreteModel(Pinf, F, L, H, Q)

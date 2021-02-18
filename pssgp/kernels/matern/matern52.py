@@ -1,5 +1,3 @@
-import math
-
 import gpflow
 import tensorflow as tf
 

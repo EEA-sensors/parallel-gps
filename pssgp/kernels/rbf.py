@@ -1,10 +1,8 @@
 import math
-from functools import partial
 from typing import Tuple
 
 import gpflow
 import gpflow.config as config
-import numba as nb
 import numpy as np
 import tensorflow as tf
 
