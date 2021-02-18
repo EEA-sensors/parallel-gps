@@ -125,6 +125,7 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
         m0 = tf.zeros(tf.shape(P0)[0], dtype=dtype)
 
         max_num_levels = math.ceil(math.log2(max_parallel))
+
         initial_elements = make_associative_filtering_elements(m0, P0, Fs, Qs, H, R, observations)
 
         final_elements = scan_associative(filtering_operator,
@@ -132,20 +133,22 @@ def pkf(lgssm, observations, return_loglikelihood=False, max_parallel=10000):
                                           max_num_levels=max_num_levels)
 
         if return_loglikelihood:
-            with tf.name_scope("log-likelihood"):
-                filtered_means = tf.concat([tf.expand_dims(m0, 0), final_elements[1][:-1]], axis=0)
-                filtered_cov = tf.concat([tf.expand_dims(P0, 0), final_elements[2][:-1]], axis=0)
-                predicted_means = mv(Fs, filtered_means)
-                predicted_covs = mm(Fs, mm(filtered_cov, Fs, transpose_b=True)) + Qs
-                obs_means = mv(H, predicted_means)
-                obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True)) + tf.expand_dims(R, 0)
-                dists = MultivariateNormalTriL(obs_means, tf.linalg.cholesky(obs_covs))
-                # TODO: some logic could be added here to avoid handling the covariance of non-nan models, but no impact for GPs
-                logprobs = dists.log_prob(observations)
-                logprobs_without_nans = tf.where(tf.math.is_nan(logprobs),
-                                                 tf.zeros_like(logprobs),
-                                                 logprobs)
-            return final_elements[1], final_elements[2], tf.reduce_sum(logprobs_without_nans)
+            filtered_means = tf.concat([tf.expand_dims(m0, 0), final_elements[1][:-1]], axis=0)
+            filtered_cov = tf.concat([tf.expand_dims(P0, 0), final_elements[2][:-1]], axis=0)
+            predicted_means = mv(Fs, filtered_means)
+            predicted_covs = mm(Fs, mm(filtered_cov, Fs, transpose_b=True)) + Qs
+            obs_means = mv(H, predicted_means)
+            obs_covs = mm(H, mm(predicted_covs, H, transpose_b=True)) + tf.expand_dims(R, 0)
+
+            dists = MultivariateNormalTriL(obs_means, tf.linalg.cholesky(obs_covs))
+            # TODO: some logic could be added here to avoid handling the covariance of non-nan models, but no impact for GPs
+            logprobs = dists.log_prob(observations)
+
+            logprobs_without_nans = tf.where(tf.math.is_nan(logprobs),
+                                             tf.zeros_like(logprobs),
+                                             logprobs)
+            total_log_prob = tf.reduce_sum(logprobs_without_nans)
+            return final_elements[1], final_elements[2], total_log_prob
         return final_elements[1], final_elements[2]
 
 

@@ -87,7 +87,8 @@ class SDEKernelMixin(metaclass=abc.ABCMeta):
         lgssm: ContinuousDiscreteModel
             The associated state space model
         """
-        ssm = _get_ssm(self.get_sde(), ts, R, t0)
+        sde = self.get_sde()
+        ssm = _get_ssm(sde, ts, R, t0)
         return ssm
 
     def __add__(self, other):
@@ -176,6 +177,7 @@ class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
         Qsum = self._block_diagonal(Qs, is_positive_definite=True)
 
         Fb, Lb, Hb, Qb = balance_ss(Fsum, Lsum, Hsum, Qsum)
+
         Pinf = solve_lyap_vec(Fb, Lb, Qb)
         return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Qb)
 

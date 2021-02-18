@@ -93,7 +93,7 @@ class StateSpaceGP(GPModel, InternalDataTrainingLossMixin):
             self, Xnew: InputData, full_cov: bool = False, full_output_cov: bool = False
     ) -> MeanAndVariance:
         ts, ys = self.data
-
+        Xnew = tf.convert_to_tensor(Xnew, dtype=config.default_float())
         squeezed_ts = tf.squeeze(ts)
         squeezed_Xnew = tf.squeeze(Xnew)
         float_ys = float("nan") * tf.ones((Xnew.shape[0], ys.shape[1]), dtype=ys.dtype)

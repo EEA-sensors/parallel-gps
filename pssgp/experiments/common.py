@@ -1,7 +1,8 @@
 import enum
 import time
-import numpy as np
+
 import gpflow as gpf
+import numpy as np
 import tensorflow as tf
 from absl import flags
 from absl.flags import FLAGS
@@ -12,7 +13,6 @@ from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer, 
     make_tqdm_progress_bar_fn
 from tensorflow_probability.python.mcmc import HamiltonianMonteCarlo, MetropolisAdjustedLangevinAlgorithm, \
     NoUTurnSampler, sample_chain
-import tqdm
 
 from pssgp.kernels import Matern12, Matern32, Matern52, RBF, Periodic
 from pssgp.model import StateSpaceGP
@@ -42,6 +42,8 @@ flags.DEFINE_string("device", "/cpu:0", "Device on which to run")
 
 
 def get_simple_covariance_function(covariance_enum, **kwargs):
+    if not isinstance(covariance_enum, CovarianceEnum):
+        covariance_enum = CovarianceEnum(covariance_enum)
     if covariance_enum == CovarianceEnum.Matern12:
         return Matern12(**kwargs)
     if covariance_enum == CovarianceEnum.Matern32:
@@ -56,6 +58,8 @@ def get_simple_covariance_function(covariance_enum, **kwargs):
 
 
 def get_model(model_enum, data, noise_variance, covariance_function, max_parallel=10000):
+    if not isinstance(model_enum, ModelEnum):
+        model_enum = ModelEnum(model_enum)
     if model_enum == ModelEnum.GP:
         gp_model = GPR(data, covariance_function, None, noise_variance)
     elif model_enum == ModelEnum.SSGP:
@@ -74,7 +78,8 @@ def run_one_mcmc(n_training, gp_model):
     mcmc_helper, run_chain_fn = get_run_chain_fn(gp_model, num_samples, num_burnin_steps)
     try:
         tic = time.time()
-        result, all_traces = run_chain_fn()
+        result, is_accepted = run_chain_fn()
+        print(np.mean(is_accepted))
         run_time = time.time() - tic
         parameter_samples = mcmc_helper.convert_to_constrained_values(result)
 
@@ -122,7 +127,7 @@ def get_run_chain_fn(gp_model, num_samples, num_burnin_steps):
             num_burnin_steps=num_burnin_steps,
             current_state=mcmc_helper.current_state,
             kernel=mcmc,
-            # trace_fn=lambda _, pkr: pkr.inner_results.inner_kernel.is_accepted,
+            trace_fn=lambda _, pkr: pkr.inner_results.is_accepted
         )
 
     return mcmc_helper, run_chain_fn

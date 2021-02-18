@@ -1,20 +1,17 @@
-# Regression experiments on sinusoidal signals.
 # Corresponds to the *** of paper.
 import os
-import time
 
 import gpflow as gpf
 import numpy as np
 import tensorflow as tf
 import tqdm
 from absl import app, flags
-from gpflow import config
 from gpflow.base import PriorOn
 from gpflow.models import GPModel
 from tensorflow_probability.python.distributions import Normal
 
-from pssgp.experiments.common import ModelEnum, CovarianceEnum, get_simple_covariance_function, get_model, get_run_chain_fn, \
-    MCMC, run_one_mcmc
+from pssgp.experiments.common import ModelEnum, CovarianceEnum, get_simple_covariance_function, get_model, MCMC, \
+    run_one_mcmc
 from pssgp.experiments.toy_models.common import FLAGS, get_data
 
 flags.DEFINE_integer('np_seed', 42, "data model seed")
@@ -48,6 +45,8 @@ def set_priors(gp_model: GPModel):
 
 
 def run():
+    gpf.config.set_default_float(getattr(np, FLAGS.dtype))
+
     tf.random.set_seed(FLAGS.tf_seed)
     f_times = os.path.join("results", f"mcmc-times-{FLAGS.cov}-{FLAGS.model}-{FLAGS.mcmc}")
     f_posterior = os.path.join("results", f"mcmc-posterior-{FLAGS.cov}-{FLAGS.model}-{FLAGS.mcmc}")
@@ -56,13 +55,11 @@ def run():
     n_training_logspace = np.logspace(7, 14, FLAGS.n_runs, base=2, dtype=int)
 
     if FLAGS.run:
-        params_res = dict()
         times = np.empty(FLAGS.n_runs, dtype=float)
         cov_fun = get_simple_covariance_function(FLAGS.cov)
-        gpf.config.set_default_float(getattr(np, FLAGS.dtype))
         for i, n_training in tqdm.tqdm(enumerate(n_training_logspace), total=FLAGS.n_runs):
             t, *_, y = get_data(FLAGS.np_seed, n_training, 1)
-            gp_model = get_model(FLAGS.model, (t, y), FLAGS.noise_variance, cov_fun,
+            gp_model = get_model(ModelEnum(FLAGS.model), (t, y), FLAGS.noise_variance, cov_fun,
                                  t.shape[0])
             gp_model = set_priors(gp_model)
             run_time, params_res = run_one_mcmc(n_training, gp_model)

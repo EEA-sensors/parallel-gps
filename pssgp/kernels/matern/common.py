@@ -7,7 +7,6 @@ import tensorflow as tf
 from scipy.special import binom
 
 
-# @tf.function
 def _get_transition_matrix(lamda: tf.Tensor, d: int, dtype: tf.DType) -> tf.Tensor:
     with tf.name_scope("get_transition_matrix"):
         F = tf.linalg.diag(tf.ones((d - 1,), dtype=dtype), k=1, num_cols=d, num_rows=d)

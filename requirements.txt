@@ -36,6 +36,7 @@ numpy==1.19.5
 oauthlib==3.1.0
 opt-einsum==3.3.0
 packaging==20.8
+pandas==1.2.2
 parso==0.8.1
 pexpect==4.8.0
 pickleshare==0.7.5
@@ -49,6 +50,7 @@ Pygments==2.7.4
 pykalman==0.9.5
 pyparsing==2.4.7
 python-dateutil==2.8.1
+pytz==2021.1
 pyzmq==22.0.0
 requests==2.25.1
 requests-oauthlib==1.3.0
