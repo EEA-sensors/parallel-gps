@@ -34,8 +34,8 @@ noise_covariance = 1.
 lengthscale = 1.
 variance = 0.1
 
-order = 6  # Order of the RBF approximation for (P)SSGP, will not be used it the GP model is GPR
-balancing_iter = 5  # Number of balancing steps for the resulting SDE to make it more stable, will not be used it the GP model is GPR
+order = 6  # Order of the RBF approximation for (P)SSGP, will not be used if the GP model is GPR
+balancing_iter = 5  # Number of balancing steps for the resulting SDE to make it more stable, will not be used if the GP model is GPR
 
 cov_function = RBF(variance=variance, lengthscales=lengthscale, order=order, balancing_iter=balancing_iter)
 
