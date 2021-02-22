@@ -2,6 +2,17 @@
 
 Companion code leveraging [GPflow](https://gpflow.readthedocs.io/en/master/) for the paper Gaussian Process Regression in Logarithmic Time.
 
+Please cite the following paper [(arXiv preprint)](https://arxiv.org/abs/2102.09964) to use the code
+
+```
+@article{corenflos2021,
+  title={{G}aussian Process Regression in Logarithmic Time},
+  author={Adrien Corenflos and Zheng Zhao and Simo S\"{a}rkk\"{a}},
+  journal={arXiv preprint arXiv:2102.09964},
+  year={2021}
+}
+```
+
 What is it?
 -----------
 
