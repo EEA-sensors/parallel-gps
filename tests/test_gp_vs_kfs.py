@@ -1,7 +1,6 @@
 """
 Numerically test if GP reg has the same results with KFS
 """
-import time
 import unittest
 
 import gpflow as gpf
@@ -11,7 +10,6 @@ import tensorflow as tf
 from gpflow.kernels import SquaredExponential
 
 from pssgp.kernels import RBF, Periodic
-from pssgp.kernels.base import SDESum
 from pssgp.kernels.matern import Matern12, Matern32, Matern52
 from pssgp.model import StateSpaceGP
 from pssgp.toymodels import sinu, obs_noise
@@ -46,7 +44,6 @@ class GPEquivalenceTest(unittest.TestCase):
 
     def test_loglikelihood(self):
         for cov, val_tol, grad_tol in self.covs:
-            print("cov: ", cov)
             check_grad_vars = cov.trainable_variables
 
             gp_model = gpf.models.GPR(data=self.data,
@@ -100,7 +97,3 @@ class GPEquivalenceTest(unittest.TestCase):
                                     atol=val_tol, rtol=val_tol)
                 npt.assert_allclose(var_gp, var_ss,
                                     atol=val_tol, rtol=val_tol)
-
-
-if __name__ == '__main__':
-    unittest.main()

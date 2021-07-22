@@ -1,5 +1,6 @@
 absl-py==0.13.0
 argon2-cffi==20.1.0
+astroid==2.6.5
 astunparse==1.6.3
 async-generator==1.10
 attrs==21.2.0
@@ -33,6 +34,7 @@ ipykernel==6.0.3
 ipython==7.25.0
 ipython-genutils==0.2.0
 ipywidgets==7.6.3
+isort==5.9.2
 jedi==0.18.0
 Jinja2==3.0.1
 jsonschema==3.2.0
@@ -45,11 +47,13 @@ jupyterlab-widgets==1.0.0
 keras-nightly==2.5.0.dev2021032900
 Keras-Preprocessing==1.1.2
 kiwisolver==1.3.1
+lazy-object-proxy==1.6.0
 llvmlite==0.36.0
 Markdown==3.3.4
 MarkupSafe==2.0.1
 matplotlib==3.4.2
 matplotlib-inline==0.1.2
+mccabe==0.6.1
 mistune==0.8.4
 multipledispatch==0.6.0
 nbclient==0.5.3
@@ -78,6 +82,7 @@ pyasn1-modules==0.2.8
 pycparser==2.20
 Pygments==2.9.0
 pykalman==0.9.5
+pylint==2.9.5
 pyparsing==2.4.7
 pyrsistent==0.18.0
 pytest==6.2.4

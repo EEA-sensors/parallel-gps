@@ -3,11 +3,11 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
-
 from gpflow.kernels import SquaredExponential
+
 from pssgp.kernels import Periodic
-from pssgp.toymodels import sinu, obs_noise
 from pssgp.kernels.periodic import _get_offline_coeffs
+from pssgp.toymodels import sinu, obs_noise
 
 
 class PeriodicTest(unittest.TestCase):
@@ -59,7 +59,3 @@ class PeriodicTest(unittest.TestCase):
         npt.assert_almost_equal(H, H_expected)
         npt.assert_almost_equal(Q, Q_expected)
         npt.assert_almost_equal(Pinf, Pinf_expected)
-
-
-if __name__ == '__main__':
-    unittest.main()

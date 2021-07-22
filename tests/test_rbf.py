@@ -20,8 +20,8 @@ class RBFTest(unittest.TestCase):
 
         self.data = (tf.constant(self.t[:, None]), tf.constant(self.y[:, None]))
 
-        rbf_order = 3
-        self.cov = RBF(variance=1., lengthscales=0.1, order=rbf_order)
+        self.rbf_order = 3
+        self.cov = RBF(variance=1., lengthscales=0.1, order=self.rbf_order, balancing_iter=5)
 
     def test_sde_coefficients(self):
         F_expected = np.array([[0, 14.520676967550859, 0],
@@ -40,12 +40,18 @@ class RBFTest(unittest.TestCase):
 
         Pinf, F, L, H, Q = self.cov.get_sde()
 
-        npt.assert_almost_equal(F, F_expected, decimal=8)
-        npt.assert_almost_equal(L, L_expected, decimal=8)
-        npt.assert_almost_equal(H, H_expected, decimal=8)
-        npt.assert_almost_equal(Q, Q_expected, decimal=8)
-        npt.assert_almost_equal(Pinf, Pinf_expected, decimal=8)
+        npt.assert_array_almost_equal(F, F_expected, decimal=8)
+        npt.assert_array_almost_equal(L, L_expected, decimal=8)
+        npt.assert_array_almost_equal(H, H_expected, decimal=8)
+        npt.assert_array_almost_equal(Q, Q_expected, decimal=8)
+        npt.assert_array_almost_equal(Pinf, Pinf_expected, decimal=8)
 
+    def test_coefficients_convergence(self):
+        Pinf, F, L, H, Q = self.cov.get_sde()
+        Pinf2, F2, L2, H2, Q2 = RBF(variance=1., lengthscales=0.1, order=self.rbf_order, balancing_iter=15).get_sde()
 
-if __name__ == '__main__':
-    unittest.main()
+        npt.assert_array_almost_equal(Pinf, Pinf2, decimal=3)
+        npt.assert_array_almost_equal(F, F2, decimal=3)
+        npt.assert_array_almost_equal(L, L2, decimal=3)
+        npt.assert_array_almost_equal(H, H2, decimal=3)
+        npt.assert_array_almost_equal(Q, Q2, decimal=3)
