@@ -28,11 +28,6 @@ def _get_offline_coeffs(N) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     b: np.ndarray
     K: np.ndarray
     div_facto_K: np.ndarray
-
-    See Also
-    --------
-    seriescoeff.m
-
     """
     r = np.arange(0, N + 1)
     J, K = np.meshgrid(r, r)

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Tuple, Optional
+from typing import Tuple
 
 import numba as nb
 import numpy as np
@@ -8,8 +8,8 @@ from gpflow import config
 
 
 @partial(nb.jit, nopython=True)
-def nb_balance_ss(F: np.ndarray,
-                  iter: int) -> np.ndarray:
+def _numba_balance_ss(F: np.ndarray,
+                      iter: int) -> np.ndarray:
     dim = F.shape[0]
     dtype = F.dtype
     d = np.ones((dim,), dtype=dtype)
@@ -46,8 +46,6 @@ def balance_ss(F: tf.Tensor,
         Measurement matrix
     q : tf.Tensor
         Spectral dnesity
-    P: tf.Tensor, optional
-        ...
     n_iter : int
         Iteration of balancing
 
@@ -67,7 +65,7 @@ def balance_ss(F: tf.Tensor,
     https://arxiv.org/pdf/1401.5766.pdf
     """
     dtype = config.default_float()
-    d = tf.numpy_function(partial(nb_balance_ss, iter=n_iter), (F,), dtype)
+    d = tf.numpy_function(partial(_numba_balance_ss, iter=n_iter), (F,), dtype)
     d = tf.reshape(d, (tf.shape(F)[0],))  # This is to make sure that the shape of d is known at compilation time.
     F = F * d[None, :] / d[:, None]
     L = L / d[:, None]
@@ -114,7 +112,6 @@ def solve_lyap_vec(F: tf.Tensor,
 
     F1 = tf.linalg.LinearOperatorKronecker([op2, op1]).to_dense()
     F2 = tf.linalg.LinearOperatorKronecker([op1, op2]).to_dense()
-
 
     F = F1 + F2
     Q = tf.matmul(L, tf.matmul(Q, L, transpose_b=True))

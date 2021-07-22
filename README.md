@@ -16,7 +16,8 @@ Please cite the following paper [(arXiv preprint)](https://arxiv.org/abs/2102.09
 What is it?
 -----------
 
-This is an implementation of temporally parallelized and sequential state space Gaussian processes with CPU and GPU support leveraging GPflow as a framework and TensorFlow as a calculation backend.
+This is an implementation of temporally parallelized and sequential state space Gaussian processes with CPU and GPU 
+support leveraging GPflow as a framework and TensorFlow as a calculation backend.
 
 Supported covariance functions
 ------------------------------
@@ -30,7 +31,8 @@ Installation
 ------------
 Clone or download the project
 Run `python setup.py [install|develop]` depending on the level of installation you want  
-
+Note that the `requirements.txt` file is a superset of what is actually necessary to use the library and also packages 
+required for unittesting only.
 
 Example
 -------
@@ -60,4 +62,4 @@ for model in [gp, ssgp, pssgp]:
     print(model.maximum_log_likelihood_objective())
 
 ```
-For more examples, see the experiments folder which reproduces the results of our paper.
+For more examples, see the notebooks or the experiments folder which reproduces the results of our paper.

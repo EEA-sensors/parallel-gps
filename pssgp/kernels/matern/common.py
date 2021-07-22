@@ -29,8 +29,10 @@ def get_matern_sde(variance, lengthscales, d: int) -> Tuple[tf.Tensor, ...]:
 
     Parameters
     ----------
-    variance
-    lengthscales
+    variance: float
+        observation noise
+    lengthscales: tf.Tensor
+        tensor with kernel lengthscale
     d: int
         the exponent of the Matern kernel plus one half
         for instance Matern32 -> 2, this will be used as the dimension of the latent SSM

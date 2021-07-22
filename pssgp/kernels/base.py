@@ -9,6 +9,7 @@ from gpflow import config
 from gpflow.kernels import Kernel
 
 from pssgp.kalman.base import LGSSM
+import pssgp.config as pssgp_config
 from pssgp.kernels.math_utils import balance_ss, solve_lyap_vec
 
 ContinuousDiscreteModel = namedtuple("ContinuousDiscreteModel", ["P0", "F", "L", "H", "Q"])
@@ -176,7 +177,7 @@ class SDESum(SDEKernelMixin, gpflow.kernels.Sum):
         Hsum = tf.concat(Hs, axis=1)
         Qsum = self._block_diagonal(Qs, is_positive_definite=True)
 
-        Fb, Lb, Hb, Qb = balance_ss(Fsum, Lsum, Hsum, Qsum)
+        Fb, Lb, Hb, Qb = balance_ss(Fsum, Lsum, Hsum, Qsum, pssgp_config.NUMBER_OF_BALANCING_STEPS)
 
         Pinf = solve_lyap_vec(Fb, Lb, Qb)
         return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Qb)
@@ -238,6 +239,6 @@ class SDEProduct(SDEKernelMixin, gpflow.kernels.Product):
                                                for sde in sdes]).to_dense()
         L = tf.eye(tf.shape(Q)[0], dtype=dtype)
 
-        Fb, Lb, Hb, Qb = balance_ss(F, L, H, Q)
+        Fb, Lb, Hb, Qb = balance_ss(F, L, H, Q, pssgp_config.NUMBER_OF_BALANCING_STEPS)
         Pinf = solve_lyap_vec(Fb, Lb, Qb)
         return ContinuousDiscreteModel(Pinf, Fb, Lb, Hb, Qb)

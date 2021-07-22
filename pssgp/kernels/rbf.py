@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from pssgp.kernels.base import ContinuousDiscreteModel, SDEKernelMixin, get_lssm_spec
+import pssgp.config as pssgp_config
 from pssgp.kernels.math_utils import balance_ss, solve_lyap_vec
 
 
@@ -23,10 +24,6 @@ def _get_unscaled_rbf_sde(order: int = 6) -> Tuple[np.ndarray, ...]:
     -------
     F, L, H, Q : np.ndarray
         SDE coefficients.
-
-    See Also
-    --------
-    se_to_ss.m
     """
     dtype = config.default_float()
     B = math.sqrt(2 * math.pi)
@@ -69,7 +66,7 @@ class RBF(SDEKernelMixin, gpflow.kernels.RBF):
 
     def __init__(self, variance=1.0, lengthscales=1.0, **kwargs):
         self._order = kwargs.pop('order', 3)
-        self._balancing_iter = kwargs.pop('balancing_iter', 5)
+        self._balancing_iter = kwargs.pop('balancing_iter', pssgp_config.NUMBER_OF_BALANCING_STEPS)
         gpflow.kernels.RBF.__init__(self, variance, lengthscales)
         SDEKernelMixin.__init__(self, **kwargs)
 
