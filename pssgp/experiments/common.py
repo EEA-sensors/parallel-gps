@@ -8,7 +8,7 @@ from absl import flags
 from absl.flags import FLAGS
 from gpflow import config
 from gpflow.kernels import SquaredExponential
-from gpflow.models import GPR
+from gpflow.models import GPR, SGPR
 from tensorflow_probability.python.experimental.mcmc import ProgressBarReducer, WithReductions, \
     make_tqdm_progress_bar_fn
 from tensorflow_probability.python.mcmc import HamiltonianMonteCarlo, MetropolisAdjustedLangevinAlgorithm, \
@@ -28,6 +28,7 @@ class ModelEnum(enum.Enum):
     GP = "GP"
     SSGP = "SSGP"
     PSSGP = "PSSGP"
+    VGP = "VGP"
 
 
 class CovarianceEnum(enum.Enum):
@@ -61,6 +62,8 @@ def get_model(model_enum, data, noise_variance, covariance_function, max_paralle
     if not isinstance(model_enum, ModelEnum):
         model_enum = ModelEnum(model_enum)
     if model_enum == ModelEnum.GP:
+        gp_model = SGPR(data, data[0][::10], covariance_function, noise_variance=noise_variance )
+    elif model_enum == ModelEnum.VGP:
         gp_model = GPR(data, covariance_function, None, noise_variance)
     elif model_enum == ModelEnum.SSGP:
         gp_model = StateSpaceGP(data, covariance_function, noise_variance, parallel=False)
