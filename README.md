@@ -43,7 +43,7 @@ from pssgp.kernels import RBF
 from pssgp.model import StateSpaceGP
 from gpflow.model import GPR
 
-data = ...
+data = ...  # Same format as for GPFlow
 noise_covariance = 1.
 lengthscale = 1.
 variance = 0.1
