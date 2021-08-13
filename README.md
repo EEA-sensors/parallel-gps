@@ -63,4 +63,4 @@ for model in [gp, ssgp, pssgp]:
     print(model.maximum_log_likelihood_objective())
 
 ```
-For more examples, see the notebooks or the experiments folder which reproduces the results of our paper.
+For more examples, see the notebooks or the runnable scripts in the experiments folder which reproduces the results of our paper.
