@@ -32,7 +32,7 @@ Installation
 Clone or download the project
 Run `python setup.py [install|develop]` depending on the level of installation you want.
 Note that in order to use the GPU capabilities you will need to install a tensorflow compatible CUDA version.
-Note that the `requirements.txt` file is a superset of what is actually necessary to use the library and also packages 
+Note that the `requirements.txt` file is a superset of what is actually necessary to use the library and also contains packages 
 required for unittesting only.
 
 Example
@@ -43,7 +43,7 @@ from pssgp.kernels import RBF
 from pssgp.model import StateSpaceGP
 from gpflow.model import GPR
 
-data = ...
+data = ...  # Same format as for GPFlow
 noise_covariance = 1.
 lengthscale = 1.
 variance = 0.1
