@@ -5,11 +5,13 @@ Companion code leveraging [GPflow](https://gpflow.readthedocs.io/en/master/) for
 Please cite the following paper [(arXiv preprint)](https://arxiv.org/abs/2102.09964) to use the code
 
 ```
-@article{corenflos2021,
+@inproceedings{corenflos2022temporal,
   title={Temporal {G}aussian Process Regression in Logarithmic Time},
-  author={Adrien Corenflos and Zheng Zhao and Simo S\"{a}rkk\"{a}},
-  journal={arXiv preprint arXiv:2102.09964},
-  year={2021}
+  author={Corenflos, Adrien and Zhao, Zheng and S{\"a}rkk{\"a}, Simo},
+  booktitle={2022 25th International Conference on Information Fusion (FUSION)},
+  pages={1--5},
+  year={2022},
+  organization={IEEE}
 }
 ```
 
